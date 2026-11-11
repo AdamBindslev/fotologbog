@@ -1,0 +1,9 @@
+# Data og uploads
+data/*.db
+data/*.sqlite*
+uploads/*
+!uploads/.htaccess
+
+# OS filer
+.DS_Store
+Thumbs.db
