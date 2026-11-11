@@ -927,7 +927,7 @@ async function loadPostsHistory() {
                             <div class="history-date">[${dateStr}] ${p.location ? '• ' + p.location : ''}</div>
                         </div>
                         <div class="history-actions">
-                            <a href="../post.php?id=${p.id}" target="_blank" class="btn-small" style="text-decoration:none;">Vis</a>
+                            <a href="../post.php?p=${p.uid || p.id}" target="_blank" class="btn-small" style="text-decoration:none;">Vis</a>
                             <button onclick="deletePost(${p.id})" class="btn-small btn-danger">Slet</button>
                         </div>
                     </div>

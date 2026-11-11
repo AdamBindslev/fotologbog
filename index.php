@@ -41,6 +41,11 @@ $totalPages = ceil($totalPosts / POSTS_PER_PAGE);
     <meta property="og:image" content="<?= UPLOADS_URL . '/' . htmlspecialchars($posts[0]['image_path']) ?>">
     <?php endif; ?>
 
+    <!-- Fonts: Newsreader (Editorial Serif) + JetBrains Mono (Technical Analog Monospace) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
     <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars(SITE_TITLE) ?> RSS Feed" href="<?= BASE_URL ?>/rss.php">
 
@@ -53,13 +58,16 @@ $totalPages = ceil($totalPosts / POSTS_PER_PAGE);
 
     <!-- Header -->
     <header class="site-header">
-        <h1 class="site-title"><a href="<?= BASE_URL ?>/"><?= htmlspecialchars(SITE_TITLE) ?></a></h1>
-        <div class="site-subtitle"><?= htmlspecialchars(SITE_SUBTITLE) ?></div>
-        <nav class="site-nav">
-            <a href="<?= BASE_URL ?>/" class="<?= ($view === 'feed' && !$filterYear) ? 'active' : '' ?>">Logbog</a>
-            <a href="<?= BASE_URL ?>/?view=archive" class="<?= ($view === 'archive') ? 'active' : '' ?>">Arkiv</a>
-            <a href="<?= BASE_URL ?>/rss.php" target="_blank">RSS</a>
-        </nav>
+        <div class="site-header-inner">
+            <h1 class="site-title"><a href="<?= BASE_URL ?>/"><?= htmlspecialchars(SITE_TITLE) ?></a></h1>
+            <nav class="site-nav">
+                <a href="<?= BASE_URL ?>/" class="<?= ($view === 'feed' && !$filterYear) ? 'active' : '' ?>">Logbog</a>
+                <span class="nav-sep">/</span>
+                <a href="<?= BASE_URL ?>/?view=archive" class="<?= ($view === 'archive') ? 'active' : '' ?>">Arkiv</a>
+                <span class="nav-sep">/</span>
+                <a href="<?= BASE_URL ?>/rss.php" target="_blank" rel="noopener">RSS</a>
+            </nav>
+        </div>
     </header>
 
     <!-- Main Content -->

@@ -141,12 +141,22 @@ if ($action === 'create_post') {
     $slug = slugify($title);
     $db = get_db();
 
+    // Generer et unikt, ikke-fortløbende UID til permalinks
+    $uid = generate_post_uid();
+    $stmtCheck = $db->prepare("SELECT COUNT(*) FROM posts WHERE uid = :uid");
+    $stmtCheck->execute([':uid' => $uid]);
+    while ($stmtCheck->fetchColumn() > 0) {
+        $uid = generate_post_uid();
+        $stmtCheck->execute([':uid' => $uid]);
+    }
+
     $stmt = $db->prepare("
-        INSERT INTO posts (title, slug, content, image_path, location, latitude, longitude, published_at, created_at, updated_at)
-        VALUES (:title, :slug, :content, :image_path, :location, :latitude, :longitude, :published_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO posts (uid, title, slug, content, image_path, location, latitude, longitude, published_at, created_at, updated_at)
+        VALUES (:uid, :title, :slug, :content, :image_path, :location, :latitude, :longitude, :published_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     ");
 
     $success = $stmt->execute([
+        ':uid' => $uid,
         ':title' => $title,
         ':slug' => $slug,
         ':content' => $content,
@@ -162,8 +172,9 @@ if ($action === 'create_post') {
         json_reply([
             'success' => true,
             'id' => $newId,
+            'uid' => $uid,
             'message' => 'Indlæg oprettet!',
-            'post_url' => BASE_URL . '/post.php?id=' . $newId
+            'post_url' => BASE_URL . '/post.php?p=' . $uid
         ]);
     } else {
         json_reply(['error' => 'Kunne ikke gemme indlægget i databasen'], 500);

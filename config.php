@@ -8,7 +8,7 @@ date_default_timezone_set('Europe/Copenhagen');
 
 // Generelle indstillinger
 define('SITE_TITLE', 'ADAM BINDSLEV // LOGBOG');
-define('SITE_SUBTITLE', 'SYS.LOG // ANALOG – Et billede og en tanke om dagen');
+define('SITE_SUBTITLE', '');
 define('SITE_AUTHOR', 'Adam Bindslev');
 define('SITE_DESCRIPTION', 'Daglig visuel logbog med fotografier, lokationer og korte refleksioner.');
 

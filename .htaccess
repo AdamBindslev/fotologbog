@@ -21,7 +21,7 @@ AddDefaultCharset UTF-8
     # Venlige genveje
     RewriteRule ^(skriv|admin)/?$ app/ [R=301,L]
     RewriteRule ^(feed|feed\.xml|rss)/?$ rss.php [L]
-    RewriteRule ^post/([0-9]+)/?$ post.php?id=$1 [L,QSA]
+    RewriteRule ^post/([a-zA-Z0-9_-]+)/?$ post.php?p=$1 [L,QSA]
 </IfModule>
 
 # Caching og komprimering

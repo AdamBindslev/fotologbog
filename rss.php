@@ -19,7 +19,8 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     <?php endif; ?>
 
     <?php foreach ($posts as $post): 
-        $postUrl = BASE_URL . '/post.php?id=' . $post['id'];
+        $uid = !empty($post['uid']) ? $post['uid'] : $post['id'];
+        $postUrl = BASE_URL . '/post.php?p=' . htmlspecialchars($uid);
         $pubDate = date(DATE_RSS, strtotime($post['published_at']));
         $imgTag = !empty($post['image_path']) ? '<p><img src="' . UPLOADS_URL . '/' . htmlspecialchars($post['image_path']) . '" alt="' . htmlspecialchars($post['title']) . '" /></p>' : '';
         $desc = $imgTag . render_content($post['content']);

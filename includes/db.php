@@ -48,6 +48,7 @@ function init_db_schema(PDO $db): void {
     $db->exec("
         CREATE TABLE IF NOT EXISTS posts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uid TEXT,
             title TEXT NOT NULL,
             slug TEXT,
             content TEXT,
@@ -61,6 +62,34 @@ function init_db_schema(PDO $db): void {
         );
         CREATE INDEX IF NOT EXISTS idx_posts_published ON posts(published_at DESC);
     ");
+
+    // Tjek om 'uid' kolonnen findes i en eksisterende tabel
+    $cols = $db->query("PRAGMA table_info(posts)")->fetchAll();
+    $hasUid = false;
+    foreach ($cols as $col) {
+        if (($col['name'] ?? '') === 'uid') {
+            $hasUid = true;
+            break;
+        }
+    }
+    if (!$hasUid) {
+        $db->exec("ALTER TABLE posts ADD COLUMN uid TEXT");
+    }
+    $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_uid ON posts(uid)");
+
+    // Udfyld manglende uid'er for eksisterende rækker så permalinks altid findes
+    $stmtMissing = $db->query("SELECT id, published_at FROM posts WHERE uid IS NULL OR uid = ''");
+    $missing = $stmtMissing->fetchAll();
+    if (!empty($missing)) {
+        $updateStmt = $db->prepare("UPDATE posts SET uid = :uid WHERE id = :id");
+        foreach ($missing as $row) {
+            $genUid = substr(hash('crc32b', 'logbog_' . $row['id'] . '_' . ($row['published_at'] ?? '')), 0, 6);
+            if (strlen($genUid) < 6) {
+                $genUid = str_pad($genUid, 6, '0');
+            }
+            $updateStmt->execute([':uid' => $genUid, ':id' => $row['id']]);
+        }
+    }
 
     // Settings tabel (til f.eks. brugerdefineret PIN eller profildata)
     $db->exec("

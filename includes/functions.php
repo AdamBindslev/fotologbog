@@ -104,6 +104,48 @@ function count_total_posts(): int {
 }
 
 /**
+ * Genererer et ikke-fortløbende, unikt alfanumerisk ID (f.eks. "8f2a4c")
+ */
+function generate_post_uid(): string {
+    return bin2hex(random_bytes(3));
+}
+
+/**
+ * Henter et specifikt indlæg ud fra UID, ID eller slug
+ */
+function get_post_by_identifier(string $identifier): ?array {
+    $db = get_db();
+    $identifier = trim($identifier);
+    if ($identifier === '') {
+        return null;
+    }
+
+    // 1. Tjek UID først (vores primære permalink-nøgle)
+    $stmt = $db->prepare("SELECT * FROM posts WHERE uid = :val LIMIT 1");
+    $stmt->execute([':val' => $identifier]);
+    $post = $stmt->fetch();
+    if ($post) {
+        return $post;
+    }
+
+    // 2. Hvis numerisk, tjek id (bagudkompatibilitet til gamle links)
+    if (ctype_digit($identifier)) {
+        $stmt = $db->prepare("SELECT * FROM posts WHERE id = :id LIMIT 1");
+        $stmt->execute([':id' => (int)$identifier]);
+        $post = $stmt->fetch();
+        if ($post) {
+            return $post;
+        }
+    }
+
+    // 3. Tjek slug som fallback
+    $stmt = $db->prepare("SELECT * FROM posts WHERE slug = :slug LIMIT 1");
+    $stmt->execute([':slug' => $identifier]);
+    $post = $stmt->fetch();
+    return $post ?: null;
+}
+
+/**
  * Henter et specifikt indlæg ud fra ID
  */
 function get_post_by_id(int $id): ?array {

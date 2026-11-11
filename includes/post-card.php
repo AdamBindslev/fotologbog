@@ -2,10 +2,11 @@
 /**
  * Post Card skabelon – Enkelt opslag i notesbogs-feedet
  */
-$postUrl = BASE_URL . '/post.php?id=' . $post['id'];
+$uid = !empty($post['uid']) ? $post['uid'] : (string)$post['id'];
+$postUrl = BASE_URL . '/post.php?p=' . htmlspecialchars($uid);
 $headerStamp = format_analog_header($post['published_at'], $post['location'] ?? null);
 ?>
-<article class="log-entry" id="entry-<?= $post['id'] ?>">
+<article class="log-entry" id="entry-<?= htmlspecialchars($uid) ?>">
     <header class="entry-header">
         <time class="entry-timestamp" datetime="<?= htmlspecialchars($post['published_at']) ?>">
             <?= $headerStamp ?>
@@ -35,14 +36,15 @@ $headerStamp = format_analog_header($post['published_at'], $post['location'] ?? 
     <?php endif; ?>
 
     <footer class="entry-meta">
-        <div>
-            <span>KL. <?= format_time($post['published_at']) ?></span>
+        <div class="meta-left">
+            <span class="meta-time">KL. <?= format_time($post['published_at']) ?></span>
             <?php if (!empty($post['location'])): ?>
-                <span>• <?= htmlspecialchars($post['location']) ?></span>
+                <span class="meta-sep">•</span>
+                <span class="meta-loc"><?= htmlspecialchars($post['location']) ?></span>
             <?php endif; ?>
         </div>
-        <div>
-            <a href="<?= $postUrl ?>" title="Permanent link">#<?= $post['id'] ?> PERMALINK</a>
+        <div class="meta-right">
+            <a href="<?= $postUrl ?>" class="entry-permalink" title="Permanent link">PERMALINK // <?= htmlspecialchars($uid) ?></a>
         </div>
     </footer>
 </article>
