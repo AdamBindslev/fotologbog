@@ -41,10 +41,10 @@ $totalPages = ceil($totalPosts / POSTS_PER_PAGE);
     <meta property="og:image" content="<?= UPLOADS_URL . '/' . htmlspecialchars($posts[0]['image_path']) ?>">
     <?php endif; ?>
 
-    <!-- Fonts: Newsreader (Editorial Serif) + JetBrains Mono (Technical Analog Monospace) -->
+    <!-- Fonts: Bebas Neue (Vintage Display) + Fraunces (Retro Serif) + Courier Prime (Typewriter) + JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
     <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars(SITE_TITLE) ?> RSS Feed" href="<?= BASE_URL ?>/rss.php">
@@ -55,23 +55,45 @@ $totalPages = ceil($totalPosts / POSTS_PER_PAGE);
 <body>
 
 <div class="site-container">
+    <div class="notebook-wrapper">
 
-    <!-- Header -->
-    <header class="site-header">
-        <div class="site-header-inner">
-            <h1 class="site-title"><a href="<?= BASE_URL ?>/"><?= htmlspecialchars(SITE_TITLE) ?></a></h1>
-            <nav class="site-nav">
-                <a href="<?= BASE_URL ?>/" class="<?= ($view === 'feed' && !$filterYear) ? 'active' : '' ?>">Logbog</a>
-                <span class="nav-sep">/</span>
-                <a href="<?= BASE_URL ?>/?view=archive" class="<?= ($view === 'archive') ? 'active' : '' ?>">Arkiv</a>
-                <span class="nav-sep">/</span>
-                <a href="<?= BASE_URL ?>/rss.php" target="_blank" rel="noopener">RSS</a>
-            </nav>
-        </div>
-    </header>
+        <!-- Spiral-ryg med wire og stansehuller -->
+        <aside class="notebook-spine" aria-hidden="true">
+            <div class="spine-wire"></div>
+            <div class="punch-hole hole-top"></div>
+            <div class="punch-hole hole-mid"></div>
+            <div class="punch-hole hole-bot"></div>
+        </aside>
 
-    <!-- Main Content -->
-    <main>
+        <div class="notebook-content">
+
+            <!-- Header med The Spiral / Collegiate æstetik -->
+            <header class="site-header">
+                <div class="header-rule-top"></div>
+                <div class="site-header-inner">
+                    <div class="header-brand">
+                        <h1 class="site-title">
+                            <a href="<?= BASE_URL ?>/">ADAM BINDSLEV <span class="title-slash">//</span> LOGBOG</a>
+                        </h1>
+                        <div class="header-badge-strip">
+                            <span class="header-badge">NARROW RULED</span>
+                            <span class="badge-dot">•</span>
+                            <span class="header-badge">MARGINAL</span>
+                            <span class="badge-dot">•</span>
+                            <span class="header-badge">NO. 843-P</span>
+                        </div>
+                    </div>
+                    <nav class="site-nav">
+                        <a href="<?= BASE_URL ?>/" class="<?= ($view === 'feed' && !$filterYear) ? 'active' : '' ?>">[ LOGBOG ]</a>
+                        <a href="<?= BASE_URL ?>/?view=archive" class="<?= ($view === 'archive') ? 'active' : '' ?>">[ ARKIV ]</a>
+                        <a href="<?= BASE_URL ?>/rss.php" target="_blank" rel="noopener">[ RSS ]</a>
+                    </nav>
+                </div>
+                <div class="header-rule-bottom"></div>
+            </header>
+
+            <!-- Main Content -->
+            <main>
         <?php if ($view === 'archive'): ?>
             <!-- Arkivvisning -->
             <h2 class="archive-title">[ ARKIVOVERSIGT ]</h2>
@@ -150,9 +172,11 @@ $totalPages = ceil($totalPosts / POSTS_PER_PAGE);
 
             <?php endif; ?>
         <?php endif; ?>
-    </main>
+            </main>
 
-</div>
+        </div><!-- /.notebook-content -->
+    </div><!-- /.notebook-wrapper -->
+</div><!-- /.site-container -->
 
 </body>
 </html>

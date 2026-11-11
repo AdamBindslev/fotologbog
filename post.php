@@ -41,10 +41,10 @@ $excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
     <meta name="twitter:image" content="<?= $imageUrl ?>">
     <?php endif; ?>
 
-    <!-- Fonts: Newsreader (Editorial Serif) + JetBrains Mono (Technical Analog Monospace) -->
+    <!-- Fonts: Bebas Neue (Vintage Display) + Fraunces (Retro Serif) + Courier Prime (Typewriter) + JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
     <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars(SITE_TITLE) ?> RSS Feed" href="<?= BASE_URL ?>/rss.php">
@@ -55,65 +55,101 @@ $excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
 <body>
 
 <div class="site-container">
+    <div class="notebook-wrapper">
 
-    <header class="site-header">
-        <div class="site-header-inner">
-            <div class="site-title"><a href="<?= BASE_URL ?>/"><?= htmlspecialchars(SITE_TITLE) ?></a></div>
-            <nav class="site-nav">
-                <a href="<?= BASE_URL ?>/">← Logbog</a>
-                <span class="nav-sep">/</span>
-                <a href="<?= BASE_URL ?>/?view=archive">Arkiv</a>
-            </nav>
-        </div>
-    </header>
+        <!-- Spiral-ryg med wire og stansehuller -->
+        <aside class="notebook-spine" aria-hidden="true">
+            <div class="spine-wire"></div>
+            <div class="punch-hole hole-top"></div>
+            <div class="punch-hole hole-mid"></div>
+            <div class="punch-hole hole-bot"></div>
+        </aside>
 
-    <main>
-        <article class="log-entry log-entry-single">
-            <header class="entry-header">
-                <time class="entry-timestamp" datetime="<?= htmlspecialchars($post['published_at']) ?>">
-                    <?= $headerStamp ?>
-                </time>
-                <h1 class="entry-title">
-                    <?= htmlspecialchars($post['title']) ?>
-                </h1>
+        <div class="notebook-content">
+
+            <!-- Header med The Spiral / Collegiate æstetik -->
+            <header class="site-header">
+                <div class="header-rule-top"></div>
+                <div class="site-header-inner">
+                    <div class="header-brand">
+                        <div class="site-title">
+                            <a href="<?= BASE_URL ?>/">ADAM BINDSLEV <span class="title-slash">//</span> LOGBOG</a>
+                        </div>
+                        <div class="header-badge-strip">
+                            <span class="header-badge">NARROW RULED</span>
+                            <span class="badge-dot">•</span>
+                            <span class="header-badge">MARGINAL</span>
+                        </div>
+                    </div>
+                    <nav class="site-nav">
+                        <a href="<?= BASE_URL ?>/">[ ← LOGBOG ]</a>
+                        <a href="<?= BASE_URL ?>/?view=archive">[ ARKIV ]</a>
+                    </nav>
+                </div>
+                <div class="header-rule-bottom"></div>
             </header>
 
-            <?php if (!empty($post['image_path'])): ?>
-                <div class="entry-photo-wrap">
-                    <img 
-                        src="<?= $imageUrl ?>" 
-                        alt="<?= htmlspecialchars($post['title']) ?>" 
-                        class="entry-photo"
-                    >
-                </div>
-            <?php endif; ?>
+            <main>
+                <article class="log-entry log-entry-single">
+                    <div class="entry-form-header">
+                        <div class="form-field form-date">
+                            <span class="field-label">DATO:</span>
+                            <time class="field-val" datetime="<?= htmlspecialchars($post['published_at']) ?>">
+                                <?= format_analog_date($post['published_at']) ?>
+                            </time>
+                        </div>
+                        <div class="form-field form-time">
+                            <span class="field-label">KL:</span>
+                            <span class="field-val"><?= format_time($post['published_at']) ?></span>
+                        </div>
+                        <?php if (!empty($post['location'])): ?>
+                        <div class="form-field form-loc">
+                            <span class="field-label">LOKATION:</span>
+                            <span class="field-val"><?= htmlspecialchars($post['location']) ?></span>
+                        </div>
+                        <?php endif; ?>
+                    </div>
 
-            <?php if (!empty($post['content'])): ?>
-                <div class="entry-body">
-                    <?= render_content($post['content']) ?>
-                </div>
-            <?php endif; ?>
+                    <h1 class="entry-title">
+                        <?= htmlspecialchars($post['title']) ?>
+                    </h1>
 
-            <footer class="entry-meta">
-                <div class="meta-left">
-                    <span class="meta-time">KL. <?= format_time($post['published_at']) ?></span>
-                    <?php if (!empty($post['location'])): ?>
-                        <span class="meta-sep">•</span>
-                        <span class="meta-loc"><?= htmlspecialchars($post['location']) ?></span>
+                    <?php if (!empty($post['image_path'])): ?>
+                        <div class="entry-photo-wrap">
+                            <span class="photo-tape photo-tape-top" aria-hidden="true"></span>
+                            <img 
+                                src="<?= $imageUrl ?>" 
+                                alt="<?= htmlspecialchars($post['title']) ?>" 
+                                class="entry-photo"
+                            >
+                        </div>
                     <?php endif; ?>
-                </div>
-                <div class="meta-right">
-                    <span class="entry-ref">REF // <?= htmlspecialchars($uid) ?></span>
-                </div>
-            </footer>
-        </article>
 
-        <div class="single-post-footer">
-            <a href="<?= BASE_URL ?>/" class="back-link">← Tilbage til alle indlæg</a>
-        </div>
-    </main>
+                    <?php if (!empty($post['content'])): ?>
+                        <div class="entry-body">
+                            <?= render_content($post['content']) ?>
+                        </div>
+                    <?php endif; ?>
 
-</div>
+                    <footer class="entry-meta">
+                        <div class="meta-bottom">
+                            <span class="meta-theme">COMBINATION THEME AND NOTE BOOK</span>
+                            <div class="entry-stamp-badge">
+                                <span class="stamp-icon">REF</span>
+                                <span class="stamp-code"><?= htmlspecialchars($uid) ?></span>
+                            </div>
+                        </div>
+                    </footer>
+                </article>
+
+                <div class="single-post-footer">
+                    <a href="<?= BASE_URL ?>/" class="back-link">← Tilbage til alle indlæg</a>
+                </div>
+            </main>
+
+        </div><!-- /.notebook-content -->
+    </div><!-- /.notebook-wrapper -->
+</div><!-- /.site-container -->
 
 </body>
 </html>
