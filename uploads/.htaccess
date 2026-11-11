@@ -1,6 +1,4 @@
-# Tillad kun visning af billeder, og forhindr afvikling af scripts
-Options -Indexes -ExecCGI
-
+# Forhindr afvikling af scripts i uploads mappen
 <FilesMatch "\.(php|phtml|php3|php4|php5|php7|php8|phps|cgi|pl|sh)$">
     <IfModule mod_authz_core.c>
         Require all denied

@@ -19,7 +19,13 @@ define('UPLOADS_DIR', BASE_DIR . '/uploads');
 define('DB_PATH', DATA_DIR . '/logbog.db');
 
 // URLs (justeres automatisk hvis logbogen ligger i en undermappe eller rod)
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)) ? "https://" : "http://";
+$isHttps = (
+    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+    (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
+    (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') ||
+    (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
+);
+$protocol = $isHttps ? "https://" : "http://";
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
 $basePath = rtrim($scriptDir, '/');
@@ -27,7 +33,8 @@ if (substr($basePath, -4) === '/app') {
     $basePath = substr($basePath, 0, -4);
 }
 define('BASE_URL', $protocol . $host . $basePath);
-define('UPLOADS_URL', BASE_URL . '/uploads');
+// UPLOADS_URL som rod-relativ URL (/uploads) så den aldrig blokeres af Mixed Content på HTTPS
+define('UPLOADS_URL', ($basePath ?: '') . '/uploads');
 
 // Sikkerhed & PIN-kode
 // Standard PIN-kode er "1234".

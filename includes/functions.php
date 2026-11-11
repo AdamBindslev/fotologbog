@@ -169,7 +169,11 @@ function save_image_data(array|string $image_input): string {
             throw new Exception('Ugyldigt billedformat');
         }
         $targetFile = $filename . '.' . $ext;
-        file_put_contents(UPLOADS_DIR . '/' . $targetFile, $decoded);
+        $destPath = UPLOADS_DIR . '/' . $targetFile;
+        if (file_put_contents($destPath, $decoded) === false) {
+            throw new Exception('Kunne ikke skrive billedfil til mappen uploads/. Tjek rettigheder.');
+        }
+        @chmod($destPath, 0644);
         return $targetFile;
     }
 
