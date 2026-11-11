@@ -37,6 +37,7 @@ function get_db(): PDO {
         $db = new PDO($dsn);
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $db->exec("PRAGMA foreign_keys = ON;");
 
         // Opret tabeller hvis de ikke findes
         init_db_schema($db);

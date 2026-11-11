@@ -394,8 +394,14 @@ if ($action === 'delete_post') {
     delete_uploaded_image($post['image_path'] ?? null);
 
     $db = get_db();
+    $stmtPt = $db->prepare("DELETE FROM post_tags WHERE post_id = :id");
+    $stmtPt->execute([':id' => $id]);
+
     $stmt = $db->prepare("DELETE FROM posts WHERE id = :id");
     $stmt->execute([':id' => $id]);
+
+    // Ryd op i eventuelle tags der ikke længere optræder på andre indlæg
+    cleanup_unused_tags();
 
     json_reply(['success' => true, 'message' => 'Indlægget er slettet']);
 }

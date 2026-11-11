@@ -2163,6 +2163,7 @@ async function deletePost(id) {
             showAlert('Indlæg slettet', 'success', 2000);
             const el = document.getElementById('hist-' + id);
             if (el) el.remove();
+            loadRecentTags();
         }
     } catch (e) {
         showAlert(e.message || 'Fejl under sletning', 'error');

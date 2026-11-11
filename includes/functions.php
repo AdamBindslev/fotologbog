@@ -593,6 +593,19 @@ function set_post_tags(int $postId, array $tags): void {
             ]);
         }
     }
+
+    cleanup_unused_tags();
+}
+
+/**
+ * Fjerner ubrugte tags og forældreløse relationer fra databasen
+ */
+function cleanup_unused_tags(): void {
+    $db = get_db();
+    // Fjern eventuelle forældreløse rækker i post_tags (hvis posts tidligere er slettet uden kaskade)
+    $db->exec("DELETE FROM post_tags WHERE post_id NOT IN (SELECT id FROM posts)");
+    // Fjern tags der ikke længere er knyttet til noget indlæg
+    $db->exec("DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM post_tags)");
 }
 
 /**
@@ -616,6 +629,7 @@ function get_post_tags(int $postId): array {
  */
 function get_all_tags_with_counts(): array {
     $db = get_db();
+    cleanup_unused_tags();
     $stmt = $db->query("
         SELECT t.id, t.name, t.slug, COUNT(pt.post_id) as post_count
         FROM tags t
