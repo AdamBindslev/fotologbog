@@ -858,7 +858,19 @@ async function apiFetch(action, options = {}) {
         headers['Authorization'] = 'Bearer ' + token;
     }
 
-    let url = 'api.php?action=' + encodeURIComponent(action);
+    let url = 'api.php?';
+    if (action.includes('&') || action.includes('=')) {
+        url += 'action=' + action;
+    } else {
+        url += 'action=' + encodeURIComponent(action);
+    }
+
+    if (options.params) {
+        for (const [k, v] of Object.entries(options.params)) {
+            url += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(v);
+        }
+    }
+
     let body = options.body;
 
     if (method === 'POST') {
@@ -1440,7 +1452,7 @@ async function loadPostsHistory() {
 // Rediger indlæg modal logik
 async function openEditModal(id) {
     try {
-        const data = await apiFetch('get_post&id=' + id);
+        const data = await apiFetch('get_post', { params: { id: id } });
         if (!data || !data.post) return;
         const p = data.post;
         document.getElementById('editPostId').value = p.id;
