@@ -4,6 +4,10 @@ data/*.sqlite*
 uploads/*
 !uploads/.htaccess
 
+# Lokale hemmeligheder og personlig konfiguration
+config.local.php
+.env
+
 # OS filer
 .DS_Store
 Thumbs.db

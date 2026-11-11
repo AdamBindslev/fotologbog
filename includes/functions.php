@@ -37,24 +37,65 @@ function format_time(string $date_str): string {
 }
 
 /**
- * Konverterer almindelig tekst/noter til pænt formateret HTML med afsnit og klikbare links
+ * Konverterer almindelig tekst/noter til pænt formateret HTML med afsnit, klikbare links
+ * og simpel skrivemaskine-markdown:
+ *   **fed**           -> <strong>
+ *   *kursiv*          -> <em>
+ *   __understreget__  -> <u class="tw-underline">
+ *   ==rødt bånd==     -> <span class="tw-red"> (også ~rødt bånd~)
+ * Alle kombinationer (f.eks. ==**fed rød**== eller *__kursiv understreget__*) understøttes,
+ * uden at skriftstørrelsen eller 32px-linjehøjden ændres.
  */
 function render_content(?string $text): string {
     if (empty($text)) {
         return '';
     }
 
-    // Rens for skadelig HTML
+    // 1. Rens for al rå HTML først (XSS-beskyttelse)
     $text = htmlspecialchars(trim($text), ENT_QUOTES, 'UTF-8');
 
-    // Gør links klikbare
-    $text = preg_replace(
+    // 2. Beskyt URL'er midlertidigt med pladsholdere, så '_' eller '~' i links ikke rammes af markdown
+    $links = [];
+    $text = preg_replace_callback(
         '~(https?://[^\s<]+)~i',
-        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
+        function ($m) use (&$links) {
+            $url = $m[1];
+            // Hvis URL'en slutter på et markdown-tegn eller punktum/komma, pil det af selve linket
+            $trailing = '';
+            while (preg_match('/([.,;:!?)~*=]|&quot;|&#039;)$/', $url, $tm)) {
+                $trailing = $tm[1] . $trailing;
+                $url = substr($url, 0, -strlen($tm[1]));
+            }
+            $key = "\x02LINK" . count($links) . "\x03";
+            $links[$key] = '<a href="' . $url . '" target="_blank" rel="noopener noreferrer">' . $url . '</a>' . $trailing;
+            return $key;
+        },
         $text
     );
 
-    // Del i afsnit ved dobbelte linjeskift
+    // 3. Simpel skrivemaskine-markdown (kan kombineres frit indeni hinanden)
+    // Rødt farvebånd: ==tekst== eller ~tekst~
+    $text = preg_replace('/==(.+?)==/s', '<span class="tw-red">$1</span>', $text);
+    $text = preg_replace('/(?<!~)~(?!~)(.+?)(?<!~)~(?!~)/s', '<span class="tw-red">$1</span>', $text);
+
+    // Understreget: __tekst__
+    $text = preg_replace('/__(.+?)__/s', '<u class="tw-underline">$1</u>', $text);
+
+    // Fed + Kursiv samlet: ***tekst***
+    $text = preg_replace('/\*\*\*(.+?)\*\*\*/s', '<strong><em>$1</em></strong>', $text);
+
+    // Fed: **tekst**
+    $text = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $text);
+
+    // Kursiv: *tekst*
+    $text = preg_replace('/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/s', '<em>$1</em>', $text);
+
+    // 4. Indsæt de beskyttede links igen
+    if (!empty($links)) {
+        $text = strtr($text, $links);
+    }
+
+    // 5. Del i afsnit ved dobbelte linjeskift
     $paragraphs = preg_split('/\n\s*\n/', $text);
     $html = '';
     foreach ($paragraphs as $p) {
@@ -65,6 +106,56 @@ function render_content(?string $text): string {
     }
 
     return $html;
+}
+
+/**
+ * Genererer et rent tekst-uddrag (uden HTML og uden markdown-tegn) til OpenGraph / sociale medier
+ */
+function get_clean_excerpt(?string $content, string $fallback = '', int $maxLen = 160): string {
+    $rendered = render_content($content);
+    $plain = html_entity_decode(strip_tags($rendered), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $plain = trim((string)preg_replace('/\s+/u', ' ', $plain));
+    if ($plain === '') {
+        return $fallback;
+    }
+    if (mb_strlen($plain, 'UTF-8') > $maxLen) {
+        return rtrim(mb_substr($plain, 0, $maxLen - 1, 'UTF-8')) . '…';
+    }
+    return $plain;
+}
+
+/**
+ * Returnerer fuld absolut URL og billeddimensioner til OpenGraph (og:image) og Twitter Cards
+ */
+function get_social_image_meta(?string $imagePath): ?array {
+    if (empty($imagePath)) {
+        return null;
+    }
+    $safeFile = basename($imagePath);
+    $fullUrl = rtrim(BASE_URL, '/') . '/uploads/' . rawurlencode($safeFile);
+    $localFile = UPLOADS_DIR . '/' . $safeFile;
+
+    $width = null;
+    $height = null;
+    $mime = 'image/jpeg';
+
+    if (is_file($localFile)) {
+        $info = @getimagesize($localFile);
+        if ($info) {
+            $width = (int)$info[0];
+            $height = (int)$info[1];
+            if (!empty($info['mime'])) {
+                $mime = $info['mime'];
+            }
+        }
+    }
+
+    return [
+        'url' => $fullUrl,
+        'width' => $width,
+        'height' => $height,
+        'mime' => $mime
+    ];
 }
 
 /**
@@ -119,6 +210,61 @@ function get_recent_posts(int $limit = 10, int $offset = 0): array {
 }
 
 /**
+ * Søger og paginerer indlæg til admin-historikken
+ */
+function search_admin_posts(string $query = '', int $limit = 50, int $offset = 0): array {
+    $db = get_db();
+    $query = trim($query);
+    if ($query === '') {
+        return get_recent_posts($limit, $offset);
+    }
+    $like = '%' . $query . '%';
+    $stmt = $db->prepare("
+        SELECT DISTINCT p.* FROM posts p
+        LEFT JOIN post_tags pt ON pt.post_id = p.id
+        LEFT JOIN tags t ON t.id = pt.tag_id
+        WHERE p.title LIKE :q
+           OR p.content LIKE :q
+           OR p.location LIKE :q
+           OR p.published_at LIKE :q
+           OR p.exif_camera LIKE :q
+           OR t.name LIKE :q
+        ORDER BY datetime(p.published_at) DESC, p.published_at DESC, p.id DESC
+        LIMIT :limit OFFSET :offset
+    ");
+    $stmt->bindValue(':q', $like, PDO::PARAM_STR);
+    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    return $stmt->fetchAll();
+}
+
+/**
+ * Tæller indlæg til admin-historikken
+ */
+function count_admin_posts(string $query = ''): int {
+    $db = get_db();
+    $query = trim($query);
+    if ($query === '') {
+        return count_total_posts();
+    }
+    $like = '%' . $query . '%';
+    $stmt = $db->prepare("
+        SELECT COUNT(DISTINCT p.id) FROM posts p
+        LEFT JOIN post_tags pt ON pt.post_id = p.id
+        LEFT JOIN tags t ON t.id = pt.tag_id
+        WHERE p.title LIKE :q
+           OR p.content LIKE :q
+           OR p.location LIKE :q
+           OR p.published_at LIKE :q
+           OR p.exif_camera LIKE :q
+           OR t.name LIKE :q
+    ");
+    $stmt->execute([':q' => $like]);
+    return (int)$stmt->fetchColumn();
+}
+
+/**
  * Tæller det samlede antal indlæg
  */
 function count_total_posts(): int {
@@ -170,6 +316,39 @@ function get_post_by_identifier(string $identifier): ?array {
 }
 
 /**
+ * Henter forrige (ældre) og næste (nyere) indlæg i forhold til et givent indlæg
+ */
+function get_adjacent_posts(array $post): array {
+    $db = get_db();
+    $pub = $post['published_at'];
+    $id = (int)$post['id'];
+
+    // Forrige (ældre) indlæg i tidslinjen
+    $stmtPrev = $db->prepare("
+        SELECT id, uid, title, published_at FROM posts
+        WHERE (datetime(published_at) < datetime(:pub))
+           OR (datetime(published_at) = datetime(:pub) AND id < :id)
+        ORDER BY datetime(published_at) DESC, id DESC
+        LIMIT 1
+    ");
+    $stmtPrev->execute([':pub' => $pub, ':id' => $id]);
+    $prev = $stmtPrev->fetch() ?: null;
+
+    // Næste (nyere) indlæg i tidslinjen
+    $stmtNext = $db->prepare("
+        SELECT id, uid, title, published_at FROM posts
+        WHERE (datetime(published_at) > datetime(:pub))
+           OR (datetime(published_at) = datetime(:pub) AND id > :id)
+        ORDER BY datetime(published_at) ASC, id ASC
+        LIMIT 1
+    ");
+    $stmtNext->execute([':pub' => $pub, ':id' => $id]);
+    $next = $stmtNext->fetch() ?: null;
+
+    return ['prev' => $prev, 'next' => $next];
+}
+
+/**
  * Henter et specifikt indlæg ud fra ID
  */
 function get_post_by_id(int $id): ?array {
@@ -213,30 +392,101 @@ function get_posts_by_month(string $year, string $month): array {
 }
 
 /**
- * Behandler og gemmer et uploadet billede (enten multipart file eller base64 data-URL)
+ * Opbygger en kontaktark-kalender (Contact Sheet) for en given måned.
+ * VIGTIGT: Tomme dage er udelukkende visuelle pladsholdere uden links til /app/.
+ */
+function get_month_contact_sheet(string $year, string $month, ?array $preloadedPosts = null): array {
+    $y = max(1970, min(2100, (int)$year));
+    $m = max(1, min(12, (int)$month));
+    $posts = $preloadedPosts ?? get_posts_by_month(sprintf('%04d', $y), sprintf('%02d', $m));
+
+    $byDay = [];
+    foreach ($posts as $p) {
+        $ts = strtotime($p['published_at'] ?? '');
+        if ($ts) {
+            $dayNum = (int)date('j', $ts);
+            // Hvis flere indlæg samme dag, behold det seneste som forside på kontaktarket og tæl antal
+            if (!isset($byDay[$dayNum])) {
+                $byDay[$dayNum] = [
+                    'post' => $p,
+                    'count' => 1
+                ];
+            } else {
+                $byDay[$dayNum]['count']++;
+            }
+        }
+    }
+
+    $firstDayTs = mktime(0, 0, 0, $m, 1, $y);
+    $daysInMonth = (int)date('t', $firstDayTs);
+    $firstWeekdayIso = (int)date('N', $firstDayTs); // 1 (Man) til 7 (Søn)
+
+    $days = [];
+    $todayStr = date('Y-m-d');
+    for ($d = 1; $d <= $daysInMonth; $d++) {
+        $dateIso = sprintf('%04d-%02d-%02d', $y, $m, $d);
+        $days[$d] = [
+            'day' => $d,
+            'date_iso' => $dateIso,
+            'date_label' => sprintf('%02d.%02d', $d, $m),
+            'is_future' => ($dateIso > $todayStr),
+            'is_today' => ($dateIso === $todayStr),
+            'entry' => $byDay[$d]['post'] ?? null,
+            'count' => $byDay[$d]['count'] ?? 0
+        ];
+    }
+
+    return [
+        'year' => sprintf('%04d', $y),
+        'month' => sprintf('%02d', $m),
+        'days_in_month' => $daysInMonth,
+        'first_weekday_iso' => $firstWeekdayIso,
+        'captured_days_count' => count($byDay),
+        'days' => $days
+    ];
+}
+
+/**
+ * Behandler og gemmer et uploadet billede med streng indholds- og MIME-validering
  */
 function save_image_data(array|string $image_input): string {
     if (!is_dir(UPLOADS_DIR)) {
         @mkdir(UPLOADS_DIR, 0755, true);
     }
 
+    $maxBytes = 15 * 1024 * 1024; // Maks 15 MB
+    $allowedMimes = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/webp' => 'webp'
+    ];
     $filename = date('Ymd_His') . '_' . bin2hex(random_bytes(4));
 
     // Tilfælde 1: Base64 data-URL (fra canvas klient-optimering)
-    if (is_string($image_input) && preg_match('/^data:image\/(\w+);base64,/', $image_input, $matches)) {
-        $ext = strtolower($matches[1]);
-        if ($ext === 'jpeg') $ext = 'jpg';
-        if (!in_array($ext, ['jpg', 'png', 'webp'])) {
-            $ext = 'jpg';
-        }
-        $data = substr($image_input, strpos($image_input, ',') + 1);
-        $decoded = base64_decode($data);
-        if ($decoded === false) {
+    if (is_string($image_input) && preg_match('/^data:image\/([a-zA-Z0-9+.-]+);base64,/', $image_input)) {
+        $commaPos = strpos($image_input, ',');
+        if ($commaPos === false) {
             throw new Exception('Ugyldigt billedformat');
         }
+        $data = substr($image_input, $commaPos + 1);
+        $decoded = base64_decode($data, true);
+        if ($decoded === false || strlen($decoded) < 32) {
+            throw new Exception('Ugyldigt Base64-billede');
+        }
+        if (strlen($decoded) > $maxBytes) {
+            throw new Exception('Billedet er for stort (maks 15 MB)');
+        }
+
+        // Streng verifikation af at de dekodede bytes faktisk er et gyldigt billede
+        $imgInfo = @getimagesizefromstring($decoded);
+        if (!$imgInfo || empty($imgInfo['mime']) || !isset($allowedMimes[$imgInfo['mime']])) {
+            throw new Exception('Filindholdet er ikke et gyldigt JPEG-, PNG- eller WebP-billede');
+        }
+
+        $ext = $allowedMimes[$imgInfo['mime']];
         $targetFile = $filename . '.' . $ext;
         $destPath = UPLOADS_DIR . '/' . $targetFile;
-        if (file_put_contents($destPath, $decoded) === false) {
+        if (file_put_contents($destPath, $decoded, LOCK_EX) === false) {
             throw new Exception('Kunne ikke skrive billedfil til mappen uploads/. Tjek rettigheder.');
         }
         @chmod($destPath, 0644);
@@ -245,26 +495,41 @@ function save_image_data(array|string $image_input): string {
 
     // Tilfælde 2: Almindelig $_FILES upload
     if (is_array($image_input) && isset($image_input['tmp_name']) && is_uploaded_file($image_input['tmp_name'])) {
-        $imgInfo = getimagesize($image_input['tmp_name']);
-        if (!$imgInfo) {
-            throw new Exception('Filen er ikke et gyldigt billede');
+        if (!empty($image_input['size']) && (int)$image_input['size'] > $maxBytes) {
+            throw new Exception('Billedet er for stort (maks 15 MB)');
         }
-        $mime = $imgInfo['mime'];
-        $ext = match ($mime) {
-            'image/jpeg' => 'jpg',
-            'image/png'  => 'png',
-            'image/webp' => 'webp',
-            default      => 'jpg'
-        };
-
+        $imgInfo = @getimagesize($image_input['tmp_name']);
+        if (!$imgInfo || empty($imgInfo['mime']) || !isset($allowedMimes[$imgInfo['mime']])) {
+            throw new Exception('Filen er ikke et gyldigt JPEG-, PNG- eller WebP-billede');
+        }
+        $ext = $allowedMimes[$imgInfo['mime']];
         $targetFile = $filename . '.' . $ext;
-        if (!move_uploaded_file($image_input['tmp_name'], UPLOADS_DIR . '/' . $targetFile)) {
+        $destPath = UPLOADS_DIR . '/' . $targetFile;
+        if (!move_uploaded_file($image_input['tmp_name'], $destPath)) {
             throw new Exception('Kunne ikke gemme billedet på serveren');
         }
+        @chmod($destPath, 0644);
         return $targetFile;
     }
 
-    throw new Exception('Intet billede modtaget');
+    throw new Exception('Intet gyldigt billede modtaget');
+}
+
+/**
+ * Sletter en billedfil sikkert fra uploads-mappen (forhindrer path traversal)
+ */
+function delete_uploaded_image(?string $imagePath): void {
+    if (empty($imagePath)) {
+        return;
+    }
+    $safeName = basename($imagePath);
+    if ($safeName === '' || $safeName === '.' || $safeName === '..' || $safeName === '.htaccess') {
+        return;
+    }
+    $fullPath = UPLOADS_DIR . '/' . $safeName;
+    if (is_file($fullPath)) {
+        @unlink($fullPath);
+    }
 }
 
 /**
@@ -379,7 +644,7 @@ function get_all_locations_with_counts(): array {
 }
 
 /**
- * Henter et samlet indeks med tags og lokationer vægtet til en levende, rodet ord-sky
+ * Henter et samlet indeks med tags og lokationer vægtet til en deterministisk, håndstemplet ord-sky
  */
 function get_unified_index_items(): array {
     $tags = get_all_tags_with_counts();
@@ -406,7 +671,7 @@ function get_unified_index_items(): array {
         if ($count > $maxCount) $maxCount = $count;
         $items[] = [
             'type' => 'location',
-            'name' => '📍 ' . $l['location'],
+            'name' => '⌖ ' . $l['location'],
             'raw_name' => $l['location'],
             'slug' => slugify($l['location']),
             'count' => $count,
@@ -414,9 +679,10 @@ function get_unified_index_items(): array {
         ];
     }
 
-    // Beregn en visuel vægt (1 til 5) samt organiske variations-parametre (hældning, drift, stil)
-    $rotations = [-3.5, -2.5, -1.8, -1.0, 0, 1.0, 1.8, 2.5, 3.5];
-    $drifts = [-8, -5, -3, 0, 3, 5, 8];
+    // Deterministiske variations-parametre (hældning, drift, stil, farvetone) baseret på crc32
+    // Så stemplerne i notesbogen har organisk karakter, men bliver på deres plads!
+    $rotations = [-3.2, -2.2, -1.4, -0.8, 0, 0.8, 1.4, 2.2, 3.2];
+    $drifts = [-6, -4, -2, 0, 2, 4, 6];
     $fontStyles = ['style-mono', 'style-typewriter', 'style-serif', 'style-display'];
     $colorTones = ['tone-ink', 'tone-red', 'tone-sepia', 'tone-faint'];
 
@@ -427,16 +693,17 @@ function get_unified_index_items(): array {
         }
         $item['weight'] = max(1, min(5, $weight));
 
-        // Tilfældig organisk variation så skyen føles levende
-        $item['rot'] = $rotations[array_rand($rotations)];
-        $item['drift'] = $drifts[array_rand($drifts)];
-        $item['font_style'] = $fontStyles[array_rand($fontStyles)];
-        $item['color_tone'] = $colorTones[array_rand($colorTones)];
+        $seed = abs(crc32($item['type'] . '::' . mb_strtolower($item['raw_name'], 'UTF-8')));
+        $item['rot'] = $rotations[$seed % count($rotations)];
+        $item['drift'] = $drifts[intdiv($seed, 7) % count($drifts)];
+        $item['font_style'] = $fontStyles[intdiv($seed, 13) % count($fontStyles)];
+        $item['color_tone'] = $colorTones[intdiv($seed, 29) % count($colorTones)];
+        $item['sort_key'] = $seed;
     }
     unset($item);
 
-    // Fuldstændig tilfældig fordeling af emner så ord med flest indlæg spredes naturligt i skyen
-    shuffle($items);
+    // Deterministisk spredning så ordene ligger stabilt fra besøg til besøg
+    usort($items, fn($a, $b) => $a['sort_key'] <=> $b['sort_key']);
 
     return $items;
 }
@@ -521,18 +788,24 @@ function count_posts_by_location(string $location): int {
 }
 
 /**
- * Formaterer en læsevenlig retro EXIF-streng: f.eks. "ƒ/2.8 · 1/250s · ISO 400"
+ * Formaterer en læsevenlig retro EXIF-streng: f.eks. "Leica Q2 · 28mm · ƒ/2.8 · 1/250s · ISO 400"
  */
 function format_exif(array $post): ?string {
     $parts = [];
+    if (!empty($post['exif_camera'])) {
+        $parts[] = trim((string)$post['exif_camera']);
+    }
+    if (!empty($post['exif_focal'])) {
+        $parts[] = trim((string)$post['exif_focal']);
+    }
     if (!empty($post['exif_aperture'])) {
-        $parts[] = $post['exif_aperture'];
+        $parts[] = trim((string)$post['exif_aperture']);
     }
     if (!empty($post['exif_shutter'])) {
-        $parts[] = $post['exif_shutter'];
+        $parts[] = trim((string)$post['exif_shutter']);
     }
     if (!empty($post['exif_iso'])) {
-        $parts[] = $post['exif_iso'];
+        $parts[] = trim((string)$post['exif_iso']);
     }
 
     if (empty($parts)) {
@@ -543,10 +816,12 @@ function format_exif(array $post): ?string {
 }
 
 /**
- * Udtrækker blænde, lukkertid, ISO og optagedato fra et lokalt billede via PHP exif hvis muligt
+ * Udtrækker kamera, brændvidde, blænde, lukkertid, ISO og optagedato fra et lokalt billede via PHP exif
  */
 function extract_exif_from_image_file(string $filePath): array {
     $result = [
+        'camera' => null,
+        'focal' => null,
         'aperture' => null,
         'shutter' => null,
         'iso' => null,
@@ -561,6 +836,34 @@ function extract_exif_from_image_file(string $filePath): array {
         $exif = @exif_read_data($filePath);
         if (!$exif || !is_array($exif)) {
             return $result;
+        }
+
+        // Kamera / Objektiv
+        $make = trim((string)($exif['Make'] ?? ''));
+        $model = trim((string)($exif['Model'] ?? ''));
+        $lens = trim((string)($exif['UndefinedTag:0xA434'] ?? $exif['LensModel'] ?? ''));
+        if ($model !== '') {
+            if ($make !== '' && stripos($model, $make) === false) {
+                $result['camera'] = $make . ' ' . $model;
+            } else {
+                $result['camera'] = $model;
+            }
+        } elseif ($lens !== '') {
+            $result['camera'] = $lens;
+        }
+
+        // Brændvidde (FocalLengthIn35mmFilm eller FocalLength)
+        if (!empty($exif['FocalLengthIn35mmFilm']) && is_numeric($exif['FocalLengthIn35mmFilm'])) {
+            $result['focal'] = round((float)$exif['FocalLengthIn35mmFilm']) . 'mm';
+        } elseif (isset($exif['FocalLength'])) {
+            $fl = $exif['FocalLength'];
+            if (is_string($fl) && strpos($fl, '/') !== false) {
+                $p = explode('/', $fl);
+                $val = (float)$p[0] / max(1, (float)$p[1]);
+                if ($val > 0) $result['focal'] = round($val) . 'mm';
+            } elseif (is_numeric($fl) && (float)$fl > 0) {
+                $result['focal'] = round((float)$fl) . 'mm';
+            }
         }
 
         // Blænde (FNumber eller ApertureValue)
@@ -636,4 +939,3 @@ function extract_exif_from_image_file(string $filePath): array {
 
     return $result;
 }
-

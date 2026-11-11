@@ -1,84 +1,109 @@
-# 📓 Logbog – SYS.LOG // ANALOG
+# 📓 Fotologbog – SYS.LOG // ANALOG
 
-En minimalistisk, hurtig og personlig fotologbog med notesbogs-æstetik. Bygget til nem daglig publicering direkte fra din telefon via en dedikeret PWA (Progressive Web App) og afviklet på Gigahost.dk med PHP og SQLite.
+En minimalistisk, hurtig og personlig fotologbog med taktil spiralnotesbogs-æstetik (*The Spiral / Collegiate*), mørkekammer-lup (lightbox) og månedlige kontaktark.
+
+Bygget til ubesværet, daglig publicering direkte fra din mobiltelefon via en dedikeret PWA (Progressive Web App). Drevet af standard PHP 8+ og en lokal SQLite-database — helt uden krav om ekstern databaseserver eller tunge frameworks.
 
 ---
 
 ## ⚡ Nøglefunktioner
 
 * **Lynhurtig mobil PWA (`/app/`):**
-  * Kan tilføjes til hjemmeskærmen på din iPhone eller Android som en app.
-  * Åbner direkte i "Nyt indlæg".
-  * **Klient-side optimering:** Billeder skaleres automatisk ned i telefonens browser før upload (maks 2048px / JPEG), så uploads tager under et sekund selv på 4G/5G.
-  * **📍 Auto-GPS:** Ét tryk henter din nøjagtige position og udfylder automatisk f.eks. "København, Vesterbro".
-  * **Husk mig:** Log ind én gang med din PIN-kode (standard: `1234`), og appen husker dig på din enhed.
-* **Analog notesbogs-æstetik:**
-  * Inspireret af `SYS.LOG // ANALOG` med tidsstempler som `[2026.11.11 // KØBENHAVN]`.
-  * Rolige, varme toner, skarp typografi og fokus på fotografiet.
+  * Kan installeres direkte på hjemmeskærmen på iPhone og Android uden en app store.
+  * Åbner med det samme i "Nyt indlæg".
+  * **Klient-side komprimering:** Billeder optimeres direkte i telefonens browser før upload (maks 2048px / JPEG), så uploads tager under et sekund selv over mobilnetværk.
+  * **📍 Auto-GPS:** Ét tryk slår din GPS-position op og udfylder automatisk f.eks. *"København, Vesterbro"*.
+  * **⌀ Automatisk EXIF-udlæsning:** Kamera, objektiv, blænde, lukkertid og ISO udlæses automatisk af billedet.
+  * **Husk mig:** Log ind én gang med din PIN-kode (standard: `1234`), og appen forbliver sikkert logget ind på din enhed.
+
+* **Analog notesbogs-æstetik & Mørkekammer:**
+  * Grafisk udtryk inspireret af klassiske spiralnotesbøger med terrakotta kraftomslag, perforerede manilablade og skrivemaskinetypografi.
+  * **Mørkekammer-lup:** Fuldskærmsvisning i mørkt rum med EXIF-stempel og lynhurtig piletast-navigation.
+  * **Månedlige kontaktark (Contact Sheets):** Visuel kalender med miniaturebilleder for hver dag i måneden.
+  * **Emnesky & Tags:** Dynamisk organisk emnesky for både tags og lokationer.
+
 * **Nul database-opsætning:**
-  * Kører på en lokal **SQLite** database (`data/logbog.db`), der oprettes automatisk. Ingen behov for at oprette brugere eller databaser i Gigahosts kontrolpanel.
-  * 1-kliks download af database-backup direkte fra PWA'en.
+  * Kører på en lokal **SQLite**-database (`data/logbog.db`), der oprettes og migreres automatisk. Ingen behov for MySQL eller serveropsætning.
+  * 1-kliks backup af databasen direkte i administrationsfladen.
+
 * **RSS Feed & Arkiv:**
-  * Måneds- og årsopdelt arkiv.
-  * Fuldgyldigt RSS 2.0 feed på `/rss.php` eller `/feed.xml`.
+  * Kronologisk arkiv opdelt efter år og måned.
+  * Fuldgyldigt RSS 2.0 feed på `/rss.php` (eller `/feed.xml`).
 
 ---
 
-## 🔒 Sikkerhed & Flerlagsbeskyttelse
+## 🔒 Sikkerhed & Arkitektur
 
-For at sikre at ingen andre kan få adgang til at poste i din logbog:
-1. **Skjult indgang:** Der er ingen offentlige links til upload-/skrivefladen på forsiden. Kun du kender adressen (`/app/` eller `/skriv`).
-2. **Brute-force spærring (Rate Limiting):** Tastes der forkert PIN-kode 5 gange i træk, spærres den pågældende IP-adresse automatisk i 15 minutter.
+Systemet er bygget efter *defense-in-depth* princippet:
+
+1. **Skjult indgang:** Forsiden indeholder ingen offentlige links til administrationsfladen. Kun du kender adressen (`/app/` eller genvejen `/skriv`).
+2. **Brute-force beskyttelse (Rate Limiting):** Efter 5 forkerte PIN-forsøg spærres IP-adressen automatisk i 15 minutter.
 3. **Lockdown Mode (Luk for nye logins):**
-   * Når du har logget ind på dine foretrukne enheder (telefon, iPad og computer), går du ind i appen under **⚙️ Indstillinger** og trykker **"🔒 Lås for nye logins"**.
-   * Serveren vil derefter **afvise 100% af alle nye login-forsøg**, uanset om de gætter din PIN-kode.
-   * Dine allerede godkendte enheder fortsætter med at virke i 1 år uden afbrydelse.
+   * Når du har logget ind på dine foretrukne enheder (f.eks. telefon og computer), aktiverer du **"🔒 Lås for nye logins"** under *⚙️ Indstillinger*.
+   * Serveren afviser derefter 100% af alle nye login-forsøg — uanset om nogen kender PIN-koden. Dine godkendte enheder forbliver logget ind.
+4. **Mappebeskyttelse mod direkte download:**
+   * Databasemappen `data/` og filen `logbog.db` er blokeret for HTTP-adgang via `.htaccess`.
+   * Uploadsmappen `uploads/` forhindrer afvikling af enhver form for PHP- eller serverscripts via Apache-direktiver.
+
+> [!WARNING]
+> Hvis du anvender **Nginx** frem for Apache, skal du sikre, at din serverblok blokerer direkte adgang til mapperne `/data/` og forhindrer script-afvikling i `/uploads/`.
 
 ---
 
-## 🚀 Opsætning på Gigahost.dk
+## 🚀 Installation & Kom i gang
 
-### 1. Upload filerne
-Upload hele indholdet af denne mappe til roden af dit domæne (eller subdomæne som `log.adambindslev.dk`) via SFTP eller FTP (f.eks. med FileZilla eller Cyberduck).
+### 1. Kopiér filerne til dit webhotel
+Overfør hele kildekoden til roden af dit webhotel (f.eks. via SFTP eller Git).
 
-### 2. Tjek skriverettigheder (vigtigt)
-Serveren skal have lov til at oprette databasen og gemme billeder:
-* Mappen `data/` skal være skrivbar (`chmod 775` eller `777`).
-* Mappen `uploads/` skal være skrivbar (`chmod 775` eller `777`).
-
-*Bemærk: SQLite-filen (`data/logbog.db`) beskyttes automatisk mod download af uvedkommende via `.htaccess`.*
-
-### 3. Første login & skift PIN-kode
-1. Gå til dit domæne i browseren på din telefon: `https://ditdomaene.dk/app/` (eller `/skriv`).
-2. Log ind med standard PIN-koden: **`1234`**.
-3. Gå ind under fanen **⚙️ Indstillinger** og skift koden til din egen personlige PIN.
-
-### 4. Tilføj til hjemmeskærmen på din telefon
-* **På iPhone (Safari):**
-  1. Åbn `https://ditdomaene.dk/app/` i Safari.
-  2. Tryk på Del-knappen (firkanten med pilen opad).
-  3. Vælg **"Føj til hjemmeskærm"** (Add to Home Screen).
-  4. Nu har du et app-ikon med kamera-søgeren på din telefon, der åbner i fuld skærm uden browserbjælker.
-* **På Android (Chrome):**
-  1. Åbn i Chrome.
-  2. Tryk på menuen (de tre prikker) og vælg **"Føj til startskærm"** eller **"Installer app"**.
-
----
-
-## 🛠️ Justering og tilpasning
-
-Alle generelle indstillinger findes øverst i `config.php`:
-
-```php
-define('SITE_TITLE', 'ADAM BINDSLEV // LOGBOG');
-define('SITE_SUBTITLE', 'SYS.LOG // ANALOG – Et billede og en tanke om dagen');
-define('SITE_AUTHOR', 'Adam Bindslev');
+### 2. Sæt skriverettigheder
+PHP-processen skal have adgang til at skrive databasen og gemme billeder:
+```bash
+chmod 775 data uploads
 ```
 
+### 3. Konfiguration
+Kopier eventuelt `config.local.php` for personlige indstillinger:
+```php
+<?php
+// config.local.php (ignoreres automatisk af git)
+define('SITE_TITLE', 'MIT NAVN // LOGBOG');
+define('SITE_AUTHOR', 'Mit Navn');
+define('SITE_DESCRIPTION', 'Min daglige visuelle fotologbog.');
+define('COUNTER_DEV_ID', ''); // Valgfrit Counter.dev analytics ID
+```
+Filen `config.local.php` indlæses automatisk af `config.php`, så dine personlige værdier aldrig overskrives eller skubbes til et offentligt Git-arkiv.
+
+### 4. Første login & skift PIN-kode
+1. Besøg dit domæne i browseren på din telefon: `https://ditdomaene.dk/app/`.
+2. Log ind med standard PIN-koden: **`1234`**.
+3. **Vigtigt:** Gå straks til fanen **⚙️ Indstillinger** og skift til din egen personlige PIN-kode.
+4. Tryk på Del-knappen i Safari (iOS) eller menuen i Chrome (Android) og vælg **"Føj til hjemmeskærm"**.
+
 ---
 
-## 💾 Backup
+## 🛠️ Krav
 
-Du har to nemme måder at tage backup på:
-1. **Fra appen:** Tryk på fanen **⚙️ Indstillinger** og klik **"Download database backup"**. Det henter `logbog_backup_YYYY-MM-DD.db` ned på din telefon eller computer.
-2. **Via FTP:** Download filen `data/logbog.db` og mappen `uploads/`.
+* PHP 8.0 eller nyere
+* PHP-udvidelser: `pdo_sqlite`, `gd` (eller `imagick`), `exif`
+* Apache webserver med `mod_rewrite` aktiveret (eller tilsvarende Nginx-opsætning)
+
+Du kan kontrollere dine serverkrav ved at logge ind og besøge `https://ditdomaene.dk/check.php`.
+
+---
+
+## 🤝 Bidrag og videreudvikling
+
+Pull requests, idéer og fejlmeldinger er meget velkomne! 
+
+Hvis du ønsker at tilføje nye funktioner eller forbedre designet:
+1. Fork repositoryet
+2. Opret en funktionsgren (`git checkout -b feature/fantastisk-ide`)
+3. Commit dine ændringer (`git commit -m 'Tilføj fantastisk idé'`)
+4. Push til din gren (`git push origin feature/fantastisk-ide`)
+5. Opret en Pull Request
+
+---
+
+## 📄 Licens
+
+Dette projekt er udgivet under [MIT Licensen](LICENSE). Du er velkommen til at bruge, tilpasse og videreudvikle koden til dine egne projekter.

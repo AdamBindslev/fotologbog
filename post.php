@@ -5,14 +5,14 @@ require_once __DIR__ . '/includes/functions.php';
 $param = $_GET['p'] ?? $_GET['id'] ?? null;
 if (!$param) {
     http_response_code(404);
-    die('Indlægget blev ikke fundet. <a href="' . BASE_URL . '/">Gå til forsiden</a>');
+    die('Indlægget blev ikke fundet. <a href="' . htmlspecialchars(BASE_URL) . '/">Gå til forsiden</a>');
 }
 
 $post = get_post_by_identifier((string)$param);
 
 if (!$post) {
     http_response_code(404);
-    die('Indlægget blev ikke fundet. <a href="' . BASE_URL . '/">Gå til forsiden</a>');
+    die('Indlægget blev ikke fundet. <a href="' . htmlspecialchars(BASE_URL) . '/">Gå til forsiden</a>');
 }
 
 $uid = !empty($post['uid']) ? $post['uid'] : (string)$post['id'];
@@ -22,7 +22,12 @@ $exifStr = format_exif($post);
 $headerStamp = format_analog_header($post['published_at'], $post['location'] ?? null);
 $pageTitle = htmlspecialchars($post['title']) . ' – ' . htmlspecialchars(SITE_TITLE);
 $imageUrl = !empty($post['image_path']) ? UPLOADS_URL . '/' . htmlspecialchars($post['image_path']) : '';
-$excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
+$socialImg = get_social_image_meta($post['image_path'] ?? null);
+$fallbackDesc = trim($headerStamp . ($exifStr ? ' · ' . $exifStr : ''));
+$excerpt = get_clean_excerpt($post['content'] ?? '', $fallbackDesc, 160);
+$adjacent = get_adjacent_posts($post);
+$prevPost = $adjacent['prev'];
+$nextPost = $adjacent['next'];
 ?>
 <!DOCTYPE html>
 <html lang="da">
@@ -32,27 +37,42 @@ $excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
     <title><?= $pageTitle ?></title>
     <meta name="description" content="<?= htmlspecialchars($excerpt) ?>">
 
-    <!-- Social & OpenGraph -->
+    <!-- Social & OpenGraph (med fuld absolut URL og dimensioner så billedet altid vises) -->
+    <meta property="og:site_name" content="<?= htmlspecialchars(SITE_TITLE) ?>">
+    <meta property="og:locale" content="da_DK">
     <meta property="og:title" content="<?= htmlspecialchars($post['title']) ?>">
     <meta property="og:description" content="<?= htmlspecialchars($excerpt) ?>">
     <meta property="og:type" content="article">
-    <meta property="og:url" content="<?= $postUrl ?>">
-    <?php if ($imageUrl): ?>
-    <meta property="og:image" content="<?= $imageUrl ?>">
+    <meta property="og:url" content="<?= htmlspecialchars($postUrl) ?>">
+    <?php if ($socialImg): ?>
+    <meta property="og:image" content="<?= htmlspecialchars($socialImg['url']) ?>">
+    <meta property="og:image:secure_url" content="<?= htmlspecialchars($socialImg['url']) ?>">
+    <meta property="og:image:type" content="<?= htmlspecialchars($socialImg['mime']) ?>">
+    <?php if ($socialImg['width'] && $socialImg['height']): ?>
+    <meta property="og:image:width" content="<?= (int)$socialImg['width'] ?>">
+    <meta property="og:image:height" content="<?= (int)$socialImg['height'] ?>">
+    <?php endif; ?>
+    <meta property="og:image:alt" content="<?= htmlspecialchars($post['title']) ?>">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="<?= $imageUrl ?>">
+    <meta name="twitter:title" content="<?= htmlspecialchars($post['title']) ?>">
+    <meta name="twitter:description" content="<?= htmlspecialchars($excerpt) ?>">
+    <meta name="twitter:image" content="<?= htmlspecialchars($socialImg['url']) ?>">
     <?php endif; ?>
 
     <!-- Fonts: Bebas Neue (Vintage Display) + Fraunces (Retro Serif) + Courier Prime (Typewriter) + JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
-    <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars(SITE_TITLE) ?> RSS Feed" href="<?= BASE_URL ?>/rss.php">
+    <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars(BASE_URL) ?>/assets/icons/favicon.svg">
+    <link rel="apple-touch-icon" href="<?= htmlspecialchars(BASE_URL) ?>/assets/icons/icon-192.png">
+    <link rel="stylesheet" href="<?= htmlspecialchars(BASE_URL) ?>/assets/css/style.css">
+    <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars(SITE_TITLE) ?> RSS Feed" href="<?= htmlspecialchars(BASE_URL) ?>/rss.php">
 
+    <?php if (defined('COUNTER_DEV_ID') && COUNTER_DEV_ID !== ''): ?>
     <!-- Counter.dev Analytics -->
-    <script src="https://cdn.counter.dev/script.js" data-id="9d6fe738-e118-4e38-b9a6-bc8a0281391f" data-utcoffset="1"></script>
+    <script src="https://cdn.counter.dev/script.js" data-id="<?= htmlspecialchars(COUNTER_DEV_ID) ?>" data-utcoffset="1"></script>
+    <?php endif; ?>
 </head>
 <body>
 
@@ -67,13 +87,19 @@ $excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
                 <div class="site-header-inner">
                     <div class="header-brand">
                         <div class="site-title">
-                            <a href="<?= BASE_URL ?>/">ADAM BINDSLEV <span class="title-slash">//</span> LOGBOG</a>
+                            <?php 
+                            $titleParts = explode('//', SITE_TITLE, 2);
+                            if (count($titleParts) === 2): ?>
+                                <a href="<?= htmlspecialchars(BASE_URL) ?>/"><?= htmlspecialchars(trim($titleParts[0])) ?> <span class="title-slash">//</span> <?= htmlspecialchars(trim($titleParts[1])) ?></a>
+                            <?php else: ?>
+                                <a href="<?= htmlspecialchars(BASE_URL) ?>/"><?= htmlspecialchars(SITE_TITLE) ?></a>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <nav class="site-nav">
-                        <a href="<?= BASE_URL ?>/">[ ← LOGBOG ]</a>
-                        <a href="<?= BASE_URL ?>/?view=archive">[ ARKIV ]</a>
-                        <a href="<?= BASE_URL ?>/?view=index">[ INDEKS ]</a>
+                        <a href="<?= htmlspecialchars(BASE_URL) ?>/">[ ← LOGBOG ]</a>
+                        <a href="<?= htmlspecialchars(BASE_URL) ?>/?view=archive">[ ARKIV ]</a>
+                        <a href="<?= htmlspecialchars(BASE_URL) ?>/?view=index">[ INDEKS ]</a>
                     </nav>
                 </div>
                 <div class="header-rule-bottom"></div>
@@ -95,7 +121,9 @@ $excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
                         <?php if (!empty($post['location'])): ?>
                         <div class="form-field form-loc">
                             <span class="field-label">LOKATION:</span>
-                            <span class="field-val"><?= htmlspecialchars($post['location']) ?></span>
+                            <a href="<?= htmlspecialchars(BASE_URL) ?>/?location=<?= urlencode($post['location']) ?>" class="field-val" style="color: inherit; text-decoration: none;">
+                                <?= htmlspecialchars($post['location']) ?>
+                            </a>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -124,14 +152,35 @@ $excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
                             <img 
                                 src="<?= $imageUrl ?>" 
                                 alt="<?= htmlspecialchars($post['title']) ?>" 
-                                class="entry-photo"
+                                class="entry-photo loupe-clickable"
+                                data-src="<?= $imageUrl ?>"
+                                data-title="<?= htmlspecialchars($post['title']) ?>"
+                                data-stamp="<?= htmlspecialchars($headerStamp) ?>"
+                                data-exif="<?= htmlspecialchars($exifStr ?? '') ?>"
+                                title="Klik for at åbne i lup (Fuld skærm)"
                             >
-                            <?php if (!empty($exifStr)): ?>
-                                <div class="entry-photo-exif" title="Kameraindstillinger: Blænde, lukkertid og ISO">
-                                    <span class="exif-icon" aria-hidden="true">📷</span>
-                                    <span class="exif-data"><?= htmlspecialchars($exifStr) ?></span>
-                                </div>
-                            <?php endif; ?>
+                            <div class="entry-photo-caption-bar">
+                                <?php if (!empty($exifStr)): ?>
+                                    <div class="entry-photo-exif" title="Kameradata (EXIF)">
+                                        <span class="exif-icon" aria-hidden="true">⌀</span>
+                                        <span class="exif-data"><?= htmlspecialchars($exifStr) ?></span>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="entry-photo-exif">
+                                        <span class="exif-icon" aria-hidden="true">⌀</span>
+                                        <span class="exif-data">Ingen Exif</span>
+                                    </div>
+                                <?php endif; ?>
+                                <button 
+                                    type="button" 
+                                    class="loupe-trigger-btn"
+                                    data-src="<?= $imageUrl ?>"
+                                    data-title="<?= htmlspecialchars($post['title']) ?>"
+                                    data-stamp="<?= htmlspecialchars($headerStamp) ?>"
+                                    data-exif="<?= htmlspecialchars($exifStr ?? '') ?>"
+                                    title="Åbn i lup (Fuld skærm)"
+                                >[ ⤢ LUP ]</button>
+                            </div>
                         </div>
                     <?php endif; ?>
 
@@ -146,7 +195,7 @@ $excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
                             <div class="meta-tags">
                                 <?php if (!empty($postTags)): ?>
                                     <?php foreach ($postTags as $t): ?>
-                                        <a href="<?= BASE_URL ?>/?tag=<?= urlencode($t['slug']) ?>" class="entry-tag-stamp" title="Se alle indlæg under #<?= htmlspecialchars($t['name']) ?>">
+                                        <a href="<?= htmlspecialchars(BASE_URL) ?>/?tag=<?= urlencode($t['slug']) ?>" class="entry-tag-stamp" title="Se alle indlæg under #<?= htmlspecialchars($t['name']) ?>">
                                             <span class="tag-hash">#</span><span class="tag-label"><?= htmlspecialchars($t['name']) ?></span>
                                         </a>
                                     <?php endforeach; ?>
@@ -162,14 +211,52 @@ $excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
                     </footer>
                 </article>
 
-                <div class="single-post-footer">
-                    <a href="<?= BASE_URL ?>/" class="back-link">← Tilbage til alle indlæg</a>
-                </div>
+                <!-- Bladring mellem dage i logbogen -->
+                <nav class="single-post-nav" aria-label="Bladr i logbogen">
+                    <div class="post-nav-slot post-nav-prev">
+                        <?php if ($prevPost): 
+                            $prevUid = !empty($prevPost['uid']) ? $prevPost['uid'] : $prevPost['id'];
+                        ?>
+                            <a href="<?= htmlspecialchars(BASE_URL) ?>/post.php?p=<?= urlencode((string)$prevUid) ?>" id="prevPostLink" class="post-nav-card" title="<?= htmlspecialchars($prevPost['title']) ?>">
+                                <span class="post-nav-dir">← [ FORRIGE OPTAGELSE ]</span>
+                                <span class="post-nav-meta"><?= format_analog_date($prevPost['published_at']) ?> · <?= htmlspecialchars($prevPost['title']) ?></span>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                    <div class="post-nav-center">
+                        <a href="<?= htmlspecialchars(BASE_URL) ?>/" class="back-link">[ OVERSIGT ]</a>
+                    </div>
+                    <div class="post-nav-slot post-nav-next">
+                        <?php if ($nextPost): 
+                            $nextUid = !empty($nextPost['uid']) ? $nextPost['uid'] : $nextPost['id'];
+                        ?>
+                            <a href="<?= htmlspecialchars(BASE_URL) ?>/post.php?p=<?= urlencode((string)$nextUid) ?>" id="nextPostLink" class="post-nav-card" title="<?= htmlspecialchars($nextPost['title']) ?>">
+                                <span class="post-nav-dir">[ NÆSTE OPTAGELSE ] →</span>
+                                <span class="post-nav-meta"><?= format_analog_date($nextPost['published_at']) ?> · <?= htmlspecialchars($nextPost['title']) ?></span>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </nav>
             </main>
 
         </div><!-- /.notebook-content -->
     </div><!-- /.notebook-wrapper -->
 </div><!-- /.site-container -->
+
+<!-- Mørkekammer Lightbox (Fuldskærms-lup) -->
+<div id="darkroomLightbox" class="darkroom-lightbox" role="dialog" aria-modal="true" aria-hidden="true">
+    <button type="button" class="darkroom-close" id="darkroomCloseBtn" aria-label="Luk visning">[ ✕ LUK // ESC ]</button>
+    <div class="darkroom-stage">
+        <img id="darkroomImg" class="darkroom-img" src="" alt="">
+        <div class="darkroom-caption">
+            <div class="darkroom-caption-main">
+                <span id="darkroomStamp" class="darkroom-stamp"></span>
+                <span id="darkroomTitle" class="darkroom-title"></span>
+            </div>
+            <div id="darkroomExif" class="darkroom-exif"></div>
+        </div>
+    </div>
+</div>
 
 <script>
 function alignNotebookBaselineGrid() {
@@ -197,6 +284,69 @@ window.addEventListener('resize', alignNotebookBaselineGrid);
 if (document.readyState === 'complete') {
     alignNotebookBaselineGrid();
 }
+
+// Mørkekammer Lightbox & Piletast-bladring
+(function() {
+    const lb = document.getElementById('darkroomLightbox');
+    const lbImg = document.getElementById('darkroomImg');
+    const lbStamp = document.getElementById('darkroomStamp');
+    const lbTitle = document.getElementById('darkroomTitle');
+    const lbExif = document.getElementById('darkroomExif');
+    const closeBtn = document.getElementById('darkroomCloseBtn');
+
+    function openLoupe(el) {
+        const src = el.getAttribute('data-src');
+        if (!src) return;
+        lbImg.src = src;
+        lbImg.alt = el.getAttribute('data-title') || '';
+        lbStamp.textContent = el.getAttribute('data-stamp') || '';
+        lbTitle.textContent = el.getAttribute('data-title') || '';
+        const exif = el.getAttribute('data-exif') || '';
+        lbExif.textContent = '⌀ ' + (exif || 'Ingen Exif');
+        lbExif.style.display = 'block';
+        lb.classList.add('active');
+        lb.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeLoupe() {
+        if (!lb.classList.contains('active')) return;
+        lb.classList.remove('active');
+        lb.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('.loupe-trigger-btn, .loupe-clickable').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.preventDefault();
+            openLoupe(el);
+        });
+    });
+
+    if (closeBtn) closeBtn.addEventListener('click', closeLoupe);
+    if (lb) {
+        lb.addEventListener('click', (e) => {
+            if (e.target === lb || e.target.classList.contains('darkroom-stage')) {
+                closeLoupe();
+            }
+        });
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && lb && lb.classList.contains('active')) {
+            closeLoupe();
+            return;
+        }
+        if (lb && lb.classList.contains('active')) return;
+        if (e.key === 'ArrowLeft') {
+            const prev = document.getElementById('prevPostLink');
+            if (prev) window.location.href = prev.href;
+        } else if (e.key === 'ArrowRight') {
+            const next = document.getElementById('nextPostLink');
+            if (next) window.location.href = next.href;
+        }
+    });
+})();
 </script>
 
 </body>

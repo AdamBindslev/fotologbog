@@ -1,5 +1,5 @@
-# Forhindr afvikling af scripts i uploads mappen
-<FilesMatch "\.(php|phtml|php3|php4|php5|php7|php8|phps|cgi|pl|sh)$">
+# Forhindr afvikling af scripts i uploads-mappen
+<FilesMatch "\.(php|phtml|phar|php3|php4|php5|php7|php8|phps|cgi|pl|py|sh|shtml|html|htm|svg)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>

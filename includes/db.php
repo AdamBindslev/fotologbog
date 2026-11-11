@@ -23,7 +23,13 @@ function get_db(): PDO {
     // Sikr data-mappen med .htaccess, så logbog.db ikke kan downloades af besøgende
     $htaccess = DATA_DIR . '/.htaccess';
     if (!file_exists($htaccess)) {
-        @file_put_contents($htaccess, "# Afvis direkte adgang til databasen\nOrder deny,allow\nDeny from all\n<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n");
+        @file_put_contents($htaccess, "# Afvis direkte adgang til databasen\n<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n    Order deny,allow\n    Deny from all\n</IfModule>\n");
+    }
+
+    // Sikr uploads-mappen mod script-afvikling (uden Options-direktiver der giver 500-fejl på Gigahost)
+    $uploadsHtaccess = UPLOADS_DIR . '/.htaccess';
+    if (!file_exists($uploadsHtaccess)) {
+        @file_put_contents($uploadsHtaccess, "# Forhindr afvikling af scripts i uploads-mappen\n<FilesMatch \"\\.(php|phtml|phar|php3|php4|php5|php7|php8|phps|cgi|pl|py|sh|shtml|html|htm|svg)$\">\n    <IfModule mod_authz_core.c>\n        Require all denied\n    </IfModule>\n    <IfModule !mod_authz_core.c>\n        Order deny,allow\n        Deny from all\n    </IfModule>\n</FilesMatch>\n");
     }
 
     $dsn = 'sqlite:' . DB_PATH;
@@ -37,9 +43,9 @@ function get_db(): PDO {
 
         return $db;
     } catch (PDOException $e) {
-        // Log fejl og vis en læsevenlig besked
+        // Log fejl uden at lække fuld serversti til besøgende
         error_log('Database fejl: ' . $e->getMessage());
-        die('Kunne ikke forbinde til databasen. Tjek tilladelser for mappen ' . htmlspecialchars(DATA_DIR));
+        die('Kunne ikke forbinde til databasen. Tjek tilladelser for mappen data/.');
     }
 }
 
@@ -84,6 +90,12 @@ function init_db_schema(PDO $db): void {
     }
     if (!in_array('exif_iso', $existingCols)) {
         $db->exec("ALTER TABLE posts ADD COLUMN exif_iso TEXT");
+    }
+    if (!in_array('exif_focal', $existingCols)) {
+        $db->exec("ALTER TABLE posts ADD COLUMN exif_focal TEXT");
+    }
+    if (!in_array('exif_camera', $existingCols)) {
+        $db->exec("ALTER TABLE posts ADD COLUMN exif_camera TEXT");
     }
 
     // Tags & Post-Tags tabeller til emner
@@ -170,5 +182,20 @@ function init_db_schema(PDO $db): void {
     if (!$stmt->fetch()) {
         $stmtInsert = $db->prepare("INSERT INTO settings (key, value) VALUES ('pin', :pin)");
         $stmtInsert->execute([':pin' => password_hash(DEFAULT_PIN, PASSWORD_DEFAULT)]);
+    }
+
+    // Generer en kryptografisk stærk nøgle til auth-tokens hvis den ikke findes
+    $stmtSec = $db->prepare("SELECT value FROM settings WHERE key = 'auth_secret'");
+    $stmtSec->execute();
+    if (!$stmtSec->fetch()) {
+        $stmtInsSec = $db->prepare("INSERT INTO settings (key, value) VALUES ('auth_secret', :sec)");
+        $stmtInsSec->execute([':sec' => bin2hex(random_bytes(32))]);
+    }
+
+    // Token-version så gamle tokens kan tilbagekaldes ved behov
+    $stmtVer = $db->prepare("SELECT value FROM settings WHERE key = 'token_version'");
+    $stmtVer->execute();
+    if (!$stmtVer->fetch()) {
+        $stmtInsVer = $db->prepare("INSERT INTO settings (key, value) VALUES ('token_version', '1')");
     }
 }

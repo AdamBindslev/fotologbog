@@ -20,22 +20,27 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 
     <?php foreach ($posts as $post): 
         $uid = !empty($post['uid']) ? $post['uid'] : $post['id'];
-        $postUrl = BASE_URL . '/post.php?p=' . htmlspecialchars($uid);
+        $postUrl = BASE_URL . '/post.php?p=' . htmlspecialchars((string)$uid);
         $pubDate = date(DATE_RSS, strtotime($post['published_at']));
-        $imgTag = !empty($post['image_path']) ? '<p><img src="' . UPLOADS_URL . '/' . htmlspecialchars($post['image_path']) . '" alt="' . htmlspecialchars($post['title']) . '" /></p>' : '';
+        $fullImgUrl = !empty($post['image_path']) ? (BASE_URL . '/uploads/' . htmlspecialchars($post['image_path'])) : '';
+        $imgTag = $fullImgUrl ? '<p><img src="' . $fullImgUrl . '" alt="' . htmlspecialchars($post['title']) . '" /></p>' : '';
         $desc = $imgTag . render_content($post['content']);
+        $exifStr = format_exif($post);
+        if (!empty($exifStr)) {
+            $desc .= '<p><small>⌀ ' . htmlspecialchars($exifStr) . '</small></p>';
+        }
         if (!empty($post['location'])) {
-            $desc .= '<p><em>Lokation: ' . htmlspecialchars($post['location']) . '</em></p>';
+            $desc .= '<p><em>⌖ ' . htmlspecialchars($post['location']) . '</em></p>';
         }
     ?>
       <item>
         <title><![CDATA[<?= format_analog_header($post['published_at'], $post['location'] ?? null) . ' ' . $post['title'] ?>]]></title>
-        <link><?= $postUrl ?></link>
-        <guid isPermaLink="true"><?= $postUrl ?></guid>
+        <link><?= htmlspecialchars($postUrl) ?></link>
+        <guid isPermaLink="true"><?= htmlspecialchars($postUrl) ?></guid>
         <pubDate><?= $pubDate ?></pubDate>
         <description><![CDATA[<?= $desc ?>]]></description>
-        <?php if (!empty($post['image_path'])): ?>
-          <enclosure url="<?= UPLOADS_URL . '/' . htmlspecialchars($post['image_path']) ?>" type="image/jpeg" />
+        <?php if ($fullImgUrl): ?>
+          <enclosure url="<?= $fullImgUrl ?>" type="image/jpeg" />
         <?php endif; ?>
       </item>
     <?php endforeach; ?>

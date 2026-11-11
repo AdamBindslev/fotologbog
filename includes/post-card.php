@@ -6,6 +6,8 @@ $uid = !empty($post['uid']) ? $post['uid'] : (string)$post['id'];
 $postUrl = BASE_URL . '/post.php?p=' . htmlspecialchars($uid);
 $postTags = get_post_tags((int)$post['id']);
 $exifStr = format_exif($post);
+$imgFullUrl = !empty($post['image_path']) ? UPLOADS_URL . '/' . htmlspecialchars($post['image_path']) : '';
+$analogStamp = format_analog_header($post['published_at'], $post['location'] ?? null);
 ?>
 <article class="log-entry" id="entry-<?= htmlspecialchars($uid) ?>">
     <!-- Vintage formular-header -->
@@ -51,20 +53,39 @@ $exifStr = format_exif($post);
                 <span class="photo-tape tape-top-left-straight" aria-hidden="true"></span>
                 <span class="photo-tape tape-top-right-straight" aria-hidden="true"></span>
             <?php endif; ?>
-            <a href="<?= $postUrl ?>">
-                <img 
-                    src="<?= UPLOADS_URL . '/' . htmlspecialchars($post['image_path']) ?>" 
-                    alt="<?= htmlspecialchars($post['title']) ?>" 
-                    class="entry-photo"
-                    loading="lazy"
-                >
-            </a>
-            <?php if (!empty($exifStr)): ?>
-                <div class="entry-photo-exif" title="Kameraindstillinger: Blænde, lukkertid og ISO">
-                    <span class="exif-icon" aria-hidden="true">📷</span>
-                    <span class="exif-data"><?= htmlspecialchars($exifStr) ?></span>
-                </div>
-            <?php endif; ?>
+            <img 
+                src="<?= $imgFullUrl ?>" 
+                alt="<?= htmlspecialchars($post['title']) ?>" 
+                class="entry-photo loupe-clickable"
+                loading="lazy"
+                data-src="<?= $imgFullUrl ?>"
+                data-title="<?= htmlspecialchars($post['title']) ?>"
+                data-stamp="<?= htmlspecialchars($analogStamp) ?>"
+                data-exif="<?= htmlspecialchars($exifStr ?? '') ?>"
+                title="Klik for at åbne i lup (Fuld skærm)"
+            >
+            <div class="entry-photo-caption-bar">
+                <?php if (!empty($exifStr)): ?>
+                    <div class="entry-photo-exif" title="Kameradata (EXIF)">
+                        <span class="exif-icon" aria-hidden="true">⌀</span>
+                        <span class="exif-data"><?= htmlspecialchars($exifStr) ?></span>
+                    </div>
+                <?php else: ?>
+                    <div class="entry-photo-exif">
+                        <span class="exif-icon" aria-hidden="true">⌀</span>
+                        <span class="exif-data">Ingen Exif</span>
+                    </div>
+                <?php endif; ?>
+                <button 
+                    type="button" 
+                    class="loupe-trigger-btn"
+                    data-src="<?= $imgFullUrl ?>"
+                    data-title="<?= htmlspecialchars($post['title']) ?>"
+                    data-stamp="<?= htmlspecialchars($analogStamp) ?>"
+                    data-exif="<?= htmlspecialchars($exifStr ?? '') ?>"
+                    title="Åbn i lup (Fuld skærm)"
+                >[ ⤢ LUP ]</button>
+            </div>
         </div>
     <?php endif; ?>
 

@@ -1,8 +1,9 @@
-const CACHE_NAME = 'logbog-pwa-v1';
+const CACHE_NAME = 'logbog-pwa-v2';
 const ASSETS_TO_CACHE = [
   './',
   './manifest.json',
   '../assets/css/style.css',
+  '../assets/icons/favicon.svg',
   '../assets/icons/icon.svg',
   '../assets/icons/icon-192.png'
 ];

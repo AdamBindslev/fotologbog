@@ -6,17 +6,32 @@
 // Sæt tidszone til København
 date_default_timezone_set('Europe/Copenhagen');
 
-// Generelle indstillinger
-define('SITE_TITLE', 'ADAM BINDSLEV // LOGBOG');
-define('SITE_SUBTITLE', '');
-define('SITE_AUTHOR', 'Adam Bindslev');
-define('SITE_DESCRIPTION', 'Daglig visuel logbog med fotografier, lokationer og korte refleksioner.');
+// Indlæs lokale indstillinger hvis filen findes (tillader personlig konfiguration uden at ændre Git)
+if (file_exists(__DIR__ . '/config.local.php')) {
+    require_once __DIR__ . '/config.local.php';
+}
+
+// Generelle indstillinger (standardværdier for det offentlige arkiv)
+if (!defined('SITE_TITLE')) define('SITE_TITLE', 'FOTOLOGBOG // SYS.LOG');
+if (!defined('SITE_SUBTITLE')) define('SITE_SUBTITLE', '');
+if (!defined('SITE_AUTHOR')) define('SITE_AUTHOR', 'Fotograf');
+if (!defined('SITE_DESCRIPTION')) define('SITE_DESCRIPTION', 'Daglig visuel fotologbog med fotografier, lokationer og korte refleksioner.');
+
+// Valgfri statistik (f.eks. Counter.dev data-id – lad stå tom for ingen tracking)
+if (!defined('COUNTER_DEV_ID')) define('COUNTER_DEV_ID', '');
 
 // Stier på serveren
 define('BASE_DIR', __DIR__);
 define('DATA_DIR', BASE_DIR . '/data');
 define('UPLOADS_DIR', BASE_DIR . '/uploads');
 define('DB_PATH', DATA_DIR . '/logbog.db');
+
+// Sikkerhedsheaders mod MIME-sniffing og Clickjacking
+if (!headers_sent()) {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+}
 
 // URLs (justeres automatisk hvis logbogen ligger i en undermappe eller rod)
 $isHttps = (
@@ -26,7 +41,9 @@ $isHttps = (
     (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
 );
 $protocol = $isHttps ? "https://" : "http://";
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$rawHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
+// Beskyt mod Host Header Injection – tillad kun gyldige domænetegn og evt. portnummer
+$host = preg_match('/^[a-zA-Z0-9.-]+(?::\d+)?$/', $rawHost) ? $rawHost : 'localhost';
 $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
 $basePath = rtrim($scriptDir, '/');
 if (substr($basePath, -4) === '/app') {
@@ -37,12 +54,11 @@ define('BASE_URL', $protocol . $host . $basePath);
 define('UPLOADS_URL', ($basePath ?: '') . '/uploads');
 
 // Sikkerhed & PIN-kode
-// Standard PIN-kode er "1234".
-// Du kan ændre den her, eller lave et saltet hash:
+// Standard PIN-kode "1234" bruges KUN første gang databasen oprettes.
 define('DEFAULT_PIN', '1234');
 
-// En hemmelig nøgle brugt til at signere sessions/tokens
-define('AUTH_SECRET', 'logbog_secret_key_change_me_if_desired_' . md5(__DIR__));
+// Fallback nøgle (den primære kryptografiske nøgle genereres med random_bytes(32) og gemmes i SQLite settings)
+define('AUTH_SECRET', 'logbog_fallback_secret_' . hash('sha256', __DIR__));
 
 // Antal indlæg pr. side i feedet
 define('POSTS_PER_PAGE', 10);

@@ -15,6 +15,7 @@ require_once __DIR__ . '/../includes/auth.php';
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Logbog">
     <meta name="theme-color" content="#242220">
+    <link rel="icon" type="image/svg+xml" href="../assets/icons/favicon.svg">
     <link rel="apple-touch-icon" href="../assets/icons/icon-192.png">
 
     <!-- EXIF Parser (JPEG, HEIC, WebP, PNG, TIFF) -->
@@ -206,9 +207,10 @@ require_once __DIR__ . '/../includes/auth.php';
         }
 
         .photo-picker-icon {
-            font-size: 36px;
+            font-size: 32px;
             display: block;
             margin-bottom: 8px;
+            font-family: var(--font-mono);
         }
 
         .photo-picker-text {
@@ -228,7 +230,7 @@ require_once __DIR__ . '/../includes/auth.php';
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 0 14px;
-            font-size: 14px;
+            font-size: 13px;
             font-family: var(--font-mono);
             color: var(--text-main);
             cursor: pointer;
@@ -321,7 +323,8 @@ require_once __DIR__ . '/../includes/auth.php';
         }
 
         .tab-btn .tab-icon {
-            font-size: 20px;
+            font-size: 18px;
+            font-family: var(--font-mono);
         }
 
         .tab-btn.active {
@@ -378,6 +381,7 @@ require_once __DIR__ . '/../includes/auth.php';
             padding: 6px 10px;
             border-radius: 6px;
             font-size: 12px;
+            font-family: var(--font-mono);
             border: 1px solid var(--border-color);
             background: var(--bg-color);
             color: var(--text-main);
@@ -433,6 +437,9 @@ require_once __DIR__ . '/../includes/auth.php';
             opacity: 0.7;
             font-size: 14px;
             line-height: 1;
+            background: none;
+            border: none;
+            color: inherit;
         }
 
         .tag-badge .btn-remove-tag:hover {
@@ -471,17 +478,32 @@ require_once __DIR__ . '/../includes/auth.php';
             border-color: #242220;
         }
 
-        /* EXIF Preview Box */
-        .exif-preview-box {
-            display: none;
-            margin-top: 8px;
-            font-family: var(--font-mono);
-            font-size: 12px;
-            color: var(--text-main);
-            padding: 8px 12px;
-            background: rgba(0, 0, 0, 0.03);
+        /* Missing Dates Bar in History */
+        .missing-dates-box {
+            background: var(--card-bg);
             border: 1px dashed var(--border-color);
-            border-radius: 6px;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+        }
+
+        .missing-date-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 4px 9px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-color);
+            color: var(--text-main);
+            cursor: pointer;
+        }
+
+        .missing-date-chip:hover {
+            border-color: var(--accent-red);
+            color: var(--accent-red);
         }
 
         /* Edit Modal */
@@ -523,8 +545,9 @@ require_once __DIR__ . '/../includes/auth.php';
     <!-- Header -->
     <header class="app-header">
         <div class="app-title">SYS.LOG // BACKEND</div>
-        <div>
-            <a href="<?= BASE_URL ?>/" target="_blank">Vis logbog ↗</a>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="draftBadge" style="display: none; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); cursor: pointer;" onclick="clearDraft(true)" title="Tryk for at rydde kladde">[KLADDE GEMT ✕]</span>
+            <a href="<?= htmlspecialchars(BASE_URL) ?>/" target="_blank">Vis logbog ↗</a>
         </div>
     </header>
 
@@ -534,25 +557,21 @@ require_once __DIR__ . '/../includes/auth.php';
     <!-- 1. LOGIN SKÆRM -->
     <div id="viewLogin" class="view-section">
         <div class="auth-card">
-            <div style="font-size: 40px; margin-bottom: 12px;">🔒</div>
+            <div style="font-size: 34px; margin-bottom: 12px; font-family: var(--font-mono);">[ 🔒 ]</div>
             <h2 class="auth-title">[ ADGANGSKODE ]</h2>
-            <p class="auth-desc">Indtast din personlige PIN-kode for at skrive i din logbog.</p>
+            <p class="auth-desc">Indtast din personlige kode for at skrive i logbogen.</p>
             
             <form id="loginForm" onsubmit="handleLogin(event)">
                 <input 
                     type="password" 
                     id="pinInput" 
                     class="pin-input" 
-                    pattern="[0-9]*" 
                     inputmode="numeric" 
-                    maxlength="8" 
+                    maxlength="16" 
                     placeholder="••••" 
                     required 
                     autofocus
                 >
-                <div style="margin-bottom: 18px; font-size: 13px; color: var(--text-muted);">
-                    (Standardkode er: <code>1234</code>)
-                </div>
                 <button type="submit" class="btn-primary" id="loginBtn">Lås op</button>
             </form>
         </div>
@@ -572,23 +591,27 @@ require_once __DIR__ . '/../includes/auth.php';
                     onchange="handleImageSelected(event)"
                 >
                 <div class="photo-picker" id="photoDropArea" onclick="document.getElementById('fileInput').click()">
-                    <span class="photo-picker-icon">📷</span>
+                    <span class="photo-picker-icon">[ ⌀ FOTO ]</span>
                     <div class="photo-picker-text" id="photoPickerPrompt">
-                        <strong>Tryk her for at tage eller vælge billede</strong><br>
-                        (Optimeres automatisk før upload)
+                        <strong>Tryk her for at vælge dagens fotografi</strong><br>
+                        (Udlæser automatisk optagedato, GPS &amp; EXIF)
                     </div>
                     <img id="imagePreview" class="photo-preview" alt="Preview">
                 </div>
                 <div id="imageResInfo" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 4px; display: none;"></div>
             </div>
 
-            <!-- Kameradata (EXIF) -->
+            <!-- Kameradata (EXIF) inkl. Kamera/Optik og Brændvidde -->
             <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
-                    <label class="form-label" style="margin-bottom: 0;">Kameradata (EXIF)</label>
+                    <label class="form-label" style="margin-bottom: 0;">Kameradata &amp; Optik (EXIF)</label>
                     <span id="exifStatusBadge" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
                         Udlæses automatisk fra foto
                     </span>
+                </div>
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-bottom: 8px;">
+                    <input type="text" id="exifCameraInput" class="form-control" placeholder="Kamera / Optik / Film (f.eks. Leica Q2)" title="Kamera, objektiv eller filmtype">
+                    <input type="text" id="exifFocalInput" class="form-control" placeholder="f.eks. 35mm" title="Brændvidde">
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
                     <input type="text" id="exifApertureInput" class="form-control" placeholder="f.eks. ƒ/2.8" title="Blænde">
@@ -599,7 +622,10 @@ require_once __DIR__ . '/../includes/auth.php';
 
             <!-- Lokation med GPS knap -->
             <div class="form-group">
-                <label class="form-label" for="locInput">Lokation</label>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+                    <label class="form-label" for="locInput" style="margin-bottom: 0;">Lokation</label>
+                    <span id="locOriginBadge" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);"></span>
+                </div>
                 <div class="loc-row">
                     <input 
                         type="text" 
@@ -607,8 +633,8 @@ require_once __DIR__ . '/../includes/auth.php';
                         class="form-control" 
                         placeholder="f.eks. København, Nørrebro"
                     >
-                    <button type="button" class="btn-loc" id="gpsBtn" onclick="fetchGPSLocation()">
-                        <span id="gpsIcon">📍</span> Hent GPS
+                    <button type="button" class="btn-loc" id="gpsBtn" onclick="fetchGPSLocation()" title="Hent telefonens nuværende placering">
+                        <span id="gpsIcon">⌖</span> Her &amp; nu
                     </button>
                 </div>
                 <input type="hidden" id="latInput">
@@ -618,7 +644,7 @@ require_once __DIR__ . '/../includes/auth.php';
             <!-- Dato & Tid -->
             <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
-                    <label class="form-label" for="dateInput" style="margin-bottom: 0;">Dato &amp; Klokkeslæt</label>
+                    <label class="form-label" for="dateInput" style="margin-bottom: 0;">Optagedato &amp; Klokkeslæt</label>
                     <span id="dateOriginBadge" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);"></span>
                 </div>
                 <input 
@@ -640,9 +666,17 @@ require_once __DIR__ . '/../includes/auth.php';
                 >
             </div>
 
-            <!-- Tekst / Refleksion -->
+            <!-- Tekst / Refleksion med Skrivemaskine-farvebånd & formatering -->
             <div class="form-group">
-                <label class="form-label" for="contentInput">Noter / Refleksion</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+                    <label class="form-label" for="contentInput" style="margin-bottom: 0;">Noter / Refleksion</label>
+                    <div class="tw-toolbar" style="display: flex; gap: 4px;">
+                        <button type="button" class="btn-small" style="padding: 3px 8px; font-weight: 700;" onclick="applyTypewriterFormat('contentInput', '**')" title="Fed (**tekst**)">B</button>
+                        <button type="button" class="btn-small" style="padding: 3px 8px; font-style: italic;" onclick="applyTypewriterFormat('contentInput', '*')" title="Kursiv (*tekst*)">I</button>
+                        <button type="button" class="btn-small" style="padding: 3px 8px; text-decoration: underline;" onclick="applyTypewriterFormat('contentInput', '__')" title="Understreget (__tekst__)">U</button>
+                        <button type="button" class="btn-small" style="padding: 3px 8px; color: var(--accent-red); border-color: var(--accent-red); font-weight: 600;" onclick="applyTypewriterFormat('contentInput', '==')" title="Rødt farvebånd (==tekst==)">● RØD</button>
+                    </div>
+                </div>
                 <textarea 
                     id="contentInput" 
                     class="form-control" 
@@ -685,14 +719,42 @@ require_once __DIR__ . '/../includes/auth.php';
         </form>
     </div>
 
-    <!-- 3. TIDLIGERE INDLÆG (Historik & Redigering) -->
+    <!-- 3. TIDLIGERE INDLÆG (Historik, Manglende dage & Redigering) -->
     <div id="viewHistory" class="view-section">
-        <h3 style="font-family: var(--font-mono); font-size: 14px; margin-bottom: 16px; text-transform: uppercase;">
-            [ DINE INDLÆG ]
-        </h3>
+        <!-- Overblik over manglende dage (seneste 14 dage) – kun synligt her i fotografens private app -->
+        <div id="missingDatesBox" class="missing-dates-box" style="display: none;">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase;">
+                [ LEDIGE DATOER DE SENESTE 14 DAGE – TRYK FOR AT UDFYLDE ]
+            </div>
+            <div id="missingDatesChips" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
+            <h3 style="font-family: var(--font-mono); font-size: 14px; text-transform: uppercase;">
+                [ DINE INDLÆG ]
+            </h3>
+            <span id="historyTotalLabel" style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);"></span>
+        </div>
+
+        <!-- Søgefelt til hurtigt at finde et af årets 365+ indlæg -->
+        <div class="form-group" style="margin-bottom: 14px;">
+            <input 
+                type="search" 
+                id="historySearchInput" 
+                class="form-control" 
+                placeholder="Søg i titel, dato (YYYY-MM), lokation, kamera eller #tag..."
+                oninput="handleHistorySearchInput()"
+                style="font-size: 14px; padding: 10px 12px;"
+            >
+        </div>
+
         <div id="postsListContainer">
             <p style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">Indlæser indlæg...</p>
         </div>
+
+        <button type="button" id="loadMoreHistoryBtn" class="btn-small" onclick="loadMoreHistory()" style="display: none; width: 100%; padding: 12px; margin-top: 8px; font-weight: 600;">
+            Indlæs flere indlæg...
+        </button>
     </div>
 
     <!-- 4. INDSTILLINGER & BACKUP -->
@@ -701,7 +763,7 @@ require_once __DIR__ . '/../includes/auth.php';
         <div class="settings-card" style="border-left: 4px solid var(--accent);">
             <h3 class="settings-title">[ 🔒 LUK FOR NYE LOGINS (LOCKDOWN) ]</h3>
             <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px;">
-                Når dine enheder (telefon, iPad, computer) er logget ind, kan du aktivere denne funktion. Det <strong>blokerer alle nye login-forsøg 100%</strong> – selv hvis nogen gætter din PIN-kode.
+                Når dine enheder (telefon, iPad, computer) er logget ind, kan du aktivere denne funktion. Det <strong>blokerer alle nye login-forsøg 100%</strong> – selv hvis nogen kender din PIN-kode.
             </p>
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px;">
                 <span id="lockdownStatusLabel" style="font-family: var(--font-mono); font-size: 13px; font-weight: 700;">
@@ -718,9 +780,9 @@ require_once __DIR__ . '/../includes/auth.php';
             <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 14px;">
                 Download en komplet kopi af din SQLite database (<code>logbog.db</code>) til din telefon eller computer.
             </p>
-            <a href="api.php?action=backup" class="btn-small" style="display: inline-block; padding: 10px 16px; font-weight: 600; text-decoration: none;">
+            <button type="button" id="btnBackupDb" onclick="downloadDatabaseBackup()" class="btn-small" style="padding: 10px 16px; font-weight: 600;">
                 💾 Download database backup
-            </a>
+            </button>
         </div>
 
         <div class="settings-card">
@@ -728,17 +790,25 @@ require_once __DIR__ . '/../includes/auth.php';
             <form onsubmit="handleUpdatePin(event)">
                 <div class="form-group">
                     <label class="form-label">Ny PIN-kode (min. 4 tegn)</label>
-                    <input type="password" id="newPinInput" class="form-control" required placeholder="Ny PIN">
+                    <input type="password" id="newPinInput" class="form-control" required minlength="4" placeholder="Ny PIN">
                 </div>
                 <button type="submit" class="btn-small" style="padding: 10px 16px;">Opdater PIN</button>
             </form>
         </div>
 
         <div class="settings-card">
-            <h3 class="settings-title">[ LOG UD ]</h3>
-            <button onclick="handleLogout()" class="btn-small btn-danger" style="padding: 10px 16px;">
-                Log ud af appen
-            </button>
+            <h3 class="settings-title">[ SESSIONER &amp; ENHEDER ]</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+                Du kan enten logge ud på denne enhed eller ugyldiggøre alle tidligere udstedte login-tokens på andre enheder.
+            </p>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <button type="button" onclick="handleRevokeSessions()" class="btn-small" style="padding: 10px 14px;">
+                    Log andre enheder ud
+                </button>
+                <button type="button" onclick="handleLogout()" class="btn-small btn-danger" style="padding: 10px 14px;">
+                    Log ud her
+                </button>
+            </div>
         </div>
     </div>
 
@@ -753,6 +823,24 @@ require_once __DIR__ . '/../includes/auth.php';
         </div>
         <form id="editForm" onsubmit="handleSaveEdit(event)">
             <input type="hidden" id="editPostId">
+
+            <!-- Mulighed for at skifte billede ved redigering -->
+            <div class="form-group">
+                <label class="form-label">Fotografi</label>
+                <input type="file" id="editFileInput" accept="image/*" style="display: none;" onchange="handleEditImageSelected(event)">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <img id="editImagePreview" src="" alt="Aktuelt foto" style="width: 72px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div>
+                        <button type="button" class="btn-small" onclick="document.getElementById('editFileInput').click()">
+                            Skift fotografi...
+                        </button>
+                        <div id="editImageStatus" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                            Behold nuværende foto, eller vælg et nyt
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="form-group">
                 <label class="form-label" for="editTitleInput">Overskrift</label>
                 <input type="text" id="editTitleInput" class="form-control" required>
@@ -766,19 +854,32 @@ require_once __DIR__ . '/../includes/auth.php';
                 <input type="text" id="editLocInput" class="form-control">
             </div>
             <div class="form-group">
-                <label class="form-label" for="editContentInput">Noter / Refleksion</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+                    <label class="form-label" for="editContentInput" style="margin-bottom: 0;">Noter / Refleksion</label>
+                    <div class="tw-toolbar" style="display: flex; gap: 4px;">
+                        <button type="button" class="btn-small" style="padding: 3px 8px; font-weight: 700;" onclick="applyTypewriterFormat('editContentInput', '**')" title="Fed (**tekst**)">B</button>
+                        <button type="button" class="btn-small" style="padding: 3px 8px; font-style: italic;" onclick="applyTypewriterFormat('editContentInput', '*')" title="Kursiv (*tekst*)">I</button>
+                        <button type="button" class="btn-small" style="padding: 3px 8px; text-decoration: underline;" onclick="applyTypewriterFormat('editContentInput', '__')" title="Understreget (__tekst__)">U</button>
+                        <button type="button" class="btn-small" style="padding: 3px 8px; color: var(--accent-red); border-color: var(--accent-red); font-weight: 600;" onclick="applyTypewriterFormat('editContentInput', '==')" title="Rødt farvebånd (==tekst==)">● RØD</button>
+                    </div>
+                </div>
                 <textarea id="editContentInput" class="form-control" style="min-height: 90px;"></textarea>
             </div>
             <div class="form-group">
                 <label class="form-label">Tags (Maks 3)</label>
                 <div id="editSelectedTagsContainer" class="selected-tags-container"></div>
-                <div style="display: flex; gap: 8px;">
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                     <input type="text" id="editTagInput" class="form-control" placeholder="Tilføj tag..." onkeydown="handleEditTagInputKey(event)">
                     <button type="button" class="btn-small" onclick="addEditTagFromInput()" style="white-space: nowrap;">+ Tilføj</button>
                 </div>
+                <div id="editRecentTagsContainer" class="recent-tags-chips"></div>
             </div>
             <div class="form-group">
-                <label class="form-label">Kameradata (EXIF)</label>
+                <label class="form-label">Kameradata &amp; Optik (EXIF)</label>
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-bottom: 8px;">
+                    <input type="text" id="editExifCamera" class="form-control" placeholder="Kamera / Optik / Film" title="Kamera, objektiv eller filmtype">
+                    <input type="text" id="editExifFocal" class="form-control" placeholder="f.eks. 35mm" title="Brændvidde">
+                </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
                     <input type="text" id="editExifAperture" class="form-control" placeholder="f.eks. ƒ/2.8" title="Blænde">
                     <input type="text" id="editExifShutter" class="form-control" placeholder="f.eks. 1/250s" title="Lukkertid">
@@ -796,15 +897,15 @@ require_once __DIR__ . '/../includes/auth.php';
 <!-- Bottom Navigation Bar -->
 <nav class="bottom-nav" id="bottomNav" style="display: none;">
     <button class="tab-btn active" onclick="switchView('compose')">
-        <span class="tab-icon">📷</span>
+        <span class="tab-icon">[ ⌀ ]</span>
         <span>Nyt</span>
     </button>
     <button class="tab-btn" onclick="switchView('history')">
-        <span class="tab-icon">📋</span>
+        <span class="tab-icon">[ ≡ ]</span>
         <span>Indlæg</span>
     </button>
     <button class="tab-btn" onclick="switchView('settings')">
-        <span class="tab-icon">⚙️</span>
+        <span class="tab-icon">[ ⚙ ]</span>
         <span>Indstillinger</span>
     </button>
 </nav>
@@ -816,11 +917,12 @@ if ('serviceWorker' in navigator) {
 }
 
 let compressedImageData = null;
+let editCompressedImageData = null;
+const DRAFT_STORAGE_KEY = 'logbog_draft_v1';
 
 // Initialiser standard dato
 function setDefaultDate() {
     const now = new Date();
-    // Format: YYYY-MM-DDTHH:MM
     const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     document.getElementById('dateInput').value = localIso;
 }
@@ -856,7 +958,7 @@ function switchView(viewName) {
         document.getElementById('viewHistory').classList.add('active');
         document.getElementById('bottomNav').style.display = 'flex';
         document.querySelectorAll('.tab-btn')[1].classList.add('active');
-        loadPostsHistory();
+        loadPostsHistory(true);
     } else if (viewName === 'settings') {
         document.getElementById('viewSettings').classList.add('active');
         document.getElementById('bottomNav').style.display = 'flex';
@@ -866,7 +968,7 @@ function switchView(viewName) {
     window.scrollTo(0, 0);
 }
 
-// Robust API-kald hjælper
+// Robust API-kald hjælper (sender altid token i Authorization header eller JSON-body, aldrig i URL)
 async function apiFetch(action, options = {}) {
     const token = localStorage.getItem('logbog_token') || '';
     const method = options.method || 'GET';
@@ -876,12 +978,7 @@ async function apiFetch(action, options = {}) {
         headers['Authorization'] = 'Bearer ' + token;
     }
 
-    let url = 'api.php?';
-    if (action.includes('&') || action.includes('=')) {
-        url += 'action=' + action;
-    } else {
-        url += 'action=' + encodeURIComponent(action);
-    }
+    let url = 'api.php?action=' + encodeURIComponent(action);
 
     if (options.params) {
         for (const [k, v] of Object.entries(options.params)) {
@@ -895,10 +992,9 @@ async function apiFetch(action, options = {}) {
         if (typeof body === 'object' && !(body instanceof FormData)) {
             headers['Content-Type'] = 'application/json';
             body = JSON.stringify({ ...body, token: token });
-        }
-    } else {
-        if (token) {
-            url += '&token=' + encodeURIComponent(token);
+        } else if (!body) {
+            headers['Content-Type'] = 'application/json';
+            body = JSON.stringify({ token: token });
         }
     }
 
@@ -930,8 +1026,9 @@ async function checkAuthStatus() {
     try {
         const data = await apiFetch('check_auth');
         if (data && data.authenticated) {
-            switchView('compose');
             setDefaultDate();
+            restoreDraft();
+            switchView('compose');
         } else {
             switchView('login');
         }
@@ -957,8 +1054,9 @@ async function handleLogin(e) {
             localStorage.setItem('logbog_token', data.token);
             showAlert('Logget ind!', 'success', 2000);
             document.getElementById('pinInput').value = '';
-            switchView('compose');
             setDefaultDate();
+            restoreDraft();
+            switchView('compose');
         }
     } catch (err) {
         showAlert(err.message || 'Forkert PIN-kode', 'error');
@@ -968,7 +1066,7 @@ async function handleLogin(e) {
     }
 }
 
-// Tilstand for EXIF og Tags
+// Tilstand for EXIF, Tags og Kladde
 let currentExifData = null;
 let selectedTags = [];
 let recentTagsList = [];
@@ -984,9 +1082,111 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
-// Robust EXIF-udtrækker der benytter exifr UMD (hvis loaded) samt native fallback parser
+// Auto-gem kladde i localStorage så refleksioner ikke går tabt
+function saveDraft() {
+    const draft = {
+        title: document.getElementById('titleInput')?.value || '',
+        content: document.getElementById('contentInput')?.value || '',
+        location: document.getElementById('locInput')?.value || '',
+        camera: document.getElementById('exifCameraInput')?.value || '',
+        focal: document.getElementById('exifFocalInput')?.value || '',
+        tags: selectedTags
+    };
+    const hasContent = draft.title.trim() || draft.content.trim() || draft.location.trim() || draft.tags.length > 0;
+    const badge = document.getElementById('draftBadge');
+    if (hasContent) {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+        if (badge) badge.style.display = 'inline';
+    } else {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+        if (badge) badge.style.display = 'none';
+    }
+}
+
+function restoreDraft() {
+    try {
+        const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+        if (!raw) return;
+        const draft = JSON.parse(raw);
+        if (!draft) return;
+        if (draft.title) document.getElementById('titleInput').value = draft.title;
+        if (draft.content) document.getElementById('contentInput').value = draft.content;
+        if (draft.location) document.getElementById('locInput').value = draft.location;
+        if (draft.camera && !document.getElementById('exifCameraInput').value) {
+            document.getElementById('exifCameraInput').value = draft.camera;
+        }
+        if (draft.focal && !document.getElementById('exifFocalInput').value) {
+            document.getElementById('exifFocalInput').value = draft.focal;
+        }
+        if (Array.isArray(draft.tags) && draft.tags.length > 0) {
+            selectedTags = draft.tags.slice(0, 3);
+        }
+        const badge = document.getElementById('draftBadge');
+        if (badge) badge.style.display = 'inline';
+    } catch (e) {}
+}
+
+function clearDraft(resetFields = false) {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    const badge = document.getElementById('draftBadge');
+    if (badge) badge.style.display = 'none';
+    if (resetFields) {
+        document.getElementById('titleInput').value = '';
+        document.getElementById('contentInput').value = '';
+        document.getElementById('locInput').value = '';
+        selectedTags = [];
+        renderSelectedTags();
+        showAlert('Kladde ryddet', 'success', 2000);
+    }
+}
+
+['titleInput', 'contentInput', 'locInput', 'exifCameraInput', 'exifFocalInput'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', saveDraft);
+});
+
+// Skrivemaskine-formatering (Fed, Kursiv, Understreget & Rødt zebra-bånd)
+function applyTypewriterFormat(textareaId, marker) {
+    const ta = document.getElementById(textareaId);
+    if (!ta) return;
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? ta.value.length;
+    const selected = ta.value.substring(start, end);
+    const mLen = marker.length;
+
+    // Hvis teksten allerede er pakket ind i samme markør, fjern markøren (toggle)
+    if (
+        start >= mLen &&
+        ta.value.substring(start - mLen, start) === marker &&
+        ta.value.substring(end, end + mLen) === marker
+    ) {
+        ta.value = ta.value.substring(0, start - mLen) + selected + ta.value.substring(end + mLen);
+        ta.focus();
+        ta.setSelectionRange(start - mLen, end - mLen);
+    } else {
+        const replacement = marker + selected + marker;
+        ta.value = ta.value.substring(0, start) + replacement + ta.value.substring(end);
+        ta.focus();
+        // Behold markeringen på selve teksten indeni, så man let kan kombinere (f.eks. Fed + Rød)
+        ta.setSelectionRange(start + mLen, start + mLen + selected.length);
+    }
+    if (textareaId === 'contentInput') {
+        saveDraft();
+    }
+}
+
+// Robust EXIF-udtrækker der benytter exifr UMD samt native fallback parser
 async function extractExifFromFile(file) {
-    let result = { aperture: null, shutter: null, iso: null, date: null, latitude: null, longitude: null };
+    let result = {
+        camera: null,
+        focal: null,
+        aperture: null,
+        shutter: null,
+        iso: null,
+        date: null,
+        latitude: null,
+        longitude: null
+    };
 
     // 1. Prøv exifr biblioteket (fuld understøttelse af JPEG, HEIC, PNG, WebP, TIFF)
     if (window.exifr && typeof window.exifr.parse === 'function') {
@@ -997,6 +1197,8 @@ async function extractExifFromFile(file) {
                 exif: true,
                 gps: true,
                 pick: [
+                    'Make', 'Model', 'LensModel',
+                    'FocalLength', 'FocalLengthIn35mmFormat',
                     'FNumber', 'ApertureValue', 
                     'ExposureTime', 'ShutterSpeedValue', 
                     'ISO', 'ISOSpeedRatings', 'PhotographicSensitivity', 
@@ -1006,6 +1208,24 @@ async function extractExifFromFile(file) {
             });
 
             if (data) {
+                // Kamera & Objektiv
+                const make = (data.Make || '').trim();
+                const model = (data.Model || '').trim();
+                const lens = (data.LensModel || '').trim();
+                if (model) {
+                    result.camera = (make && !model.toLowerCase().includes(make.toLowerCase()))
+                        ? `${make} ${model}`
+                        : model;
+                } else if (lens) {
+                    result.camera = lens;
+                }
+
+                // Brændvidde
+                const fl = data.FocalLengthIn35mmFormat || data.FocalLength;
+                if (fl && !isNaN(fl) && Number(fl) > 0) {
+                    result.focal = Math.round(Number(fl)) + 'mm';
+                }
+
                 // Blænde
                 if (data.FNumber) {
                     result.aperture = 'ƒ/' + (Math.round(data.FNumber * 10) / 10);
@@ -1057,7 +1277,7 @@ async function extractExifFromFile(file) {
                     result.longitude = data.longitude;
                 }
 
-                if (result.aperture || result.shutter || result.iso || result.date) {
+                if (result.camera || result.focal || result.aperture || result.shutter || result.iso || result.date) {
                     return result;
                 }
             }
@@ -1114,7 +1334,7 @@ function parseExifFallback(buffer) {
 
                 const ifd0Offset = tiffStart + view.getUint32(tiffStart + 4, bigEndian);
                 if (ifd0Offset < length) {
-                    const result = { aperture: null, shutter: null, iso: null, date: null };
+                    const result = { camera: null, focal: null, aperture: null, shutter: null, iso: null, date: null };
                     let exifIfdOffset = null;
                     const numEntries0 = view.getUint16(ifd0Offset, bigEndian);
 
@@ -1127,6 +1347,10 @@ function parseExifFallback(buffer) {
                         } else if (tag === 0x0132 && !result.date) {
                             const dOffset = tiffStart + view.getUint32(entryOffset + 8, bigEndian);
                             result.date = readExifDateString(view, dOffset, length);
+                        } else if (tag === 0x0110 && !result.camera) {
+                            const count = view.getUint32(entryOffset + 4, bigEndian);
+                            const mOffset = count > 4 ? (tiffStart + view.getUint32(entryOffset + 8, bigEndian)) : (entryOffset + 8);
+                            result.camera = readAsciiString(view, mOffset, Math.min(count, 48), length);
                         }
                     }
 
@@ -1165,6 +1389,17 @@ function parseExifFallback(buffer) {
                                         }
                                     }
                                 }
+                            } else if (tag === 0x920A && !result.focal) {
+                                if (valOffset + 8 <= length) {
+                                    const num = view.getUint32(valOffset, bigEndian);
+                                    const den = view.getUint32(valOffset + 4, bigEndian);
+                                    if (num > 0 && den > 0) {
+                                        result.focal = Math.round(num / den) + 'mm';
+                                    }
+                                }
+                            } else if (tag === 0xA405 && !result.focal) {
+                                const fl35 = view.getUint16(entryOffset + 8, bigEndian);
+                                if (fl35 > 0) result.focal = fl35 + 'mm';
                             } else if (tag === 0x8827 || tag === 0x8832) {
                                 const entryType = view.getUint16(entryOffset + 2, bigEndian);
                                 let iso = 0;
@@ -1182,7 +1417,7 @@ function parseExifFallback(buffer) {
                         }
                     }
 
-                    if (result.aperture || result.shutter || result.iso || result.date) {
+                    if (result.camera || result.focal || result.aperture || result.shutter || result.iso || result.date) {
                         return result;
                     }
                 }
@@ -1192,6 +1427,17 @@ function parseExifFallback(buffer) {
         offset += 2 + segLength;
     }
     return null;
+}
+
+function readAsciiString(view, offset, count, maxLen) {
+    if (offset < 0 || offset + count > maxLen) return null;
+    let str = '';
+    for (let i = 0; i < count; i++) {
+        const ch = view.getUint8(offset + i);
+        if (ch === 0) break;
+        if (ch >= 32 && ch <= 126) str += String.fromCharCode(ch);
+    }
+    return str.trim() || null;
 }
 
 function readExifDateString(view, offset, maxLen) {
@@ -1207,30 +1453,102 @@ function readExifDateString(view, offset, maxLen) {
     return null;
 }
 
+// Skaler og optimer billede skånsomt (2400px @ 92% JPEG-kvalitet for at bevare filmkorn og toneovergange)
+function compressImageFileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Kunne ikke læse billedfil'));
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onerror = () => reject(new Error('Ugyldigt billede'));
+            img.onload = function() {
+                const maxDimension = 2400;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxDimension || height > maxDimension) {
+                    if (width > height) {
+                        height = Math.round((height * maxDimension) / width);
+                        width = maxDimension;
+                    } else {
+                        width = Math.round((width * maxDimension) / height);
+                        height = maxDimension;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+                const approxSizeKb = Math.round((dataUrl.length * 3 / 4) / 1024);
+                resolve({ dataUrl, width, height, approxSizeKb });
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// Reverse geocoding (bruges både ved EXIF-GPS fra foto og ved manuel GPS-knap)
+async function reverseGeocodeCoords(lat, lon, fromPhotoExif = false) {
+    const locInput = document.getElementById('locInput');
+    const locBadge = document.getElementById('locOriginBadge');
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&zoom=14&addressdetails=1`, {
+            headers: { 'Accept-Language': 'da, en' }
+        });
+        const data = await res.json();
+        if (data && data.address) {
+            const addr = data.address;
+            const city = addr.city || addr.town || addr.village || addr.municipality || '';
+            const district = addr.suburb || addr.neighbourhood || addr.quarter || '';
+
+            let locName = '';
+            if (city && district && city !== district) {
+                locName = `${city}, ${district}`;
+            } else {
+                locName = city || district || 'Danmark';
+            }
+            locInput.value = locName;
+            if (locBadge) {
+                locBadge.textContent = fromPhotoExif ? '✓ Fra foto-GPS' : '✓ Fra enheds-GPS';
+                locBadge.style.color = 'var(--accent-red)';
+            }
+            saveDraft();
+            return locName;
+        }
+    } catch (e) {}
+    return null;
+}
+
 // Billedbehandling & Klient-optimering (Canvas)
 async function handleImageSelected(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Prøv at udtrække EXIF direkte fra råfilen før canvas-komprimering
+    // 1. Udtræk EXIF direkte fra råfilen før canvas-komprimering
     try {
         const exifData = await extractExifFromFile(file);
         if (exifData) {
             currentExifData = exifData;
 
-            // Udfyld EXIF felterne i skrivefladen
+            if (exifData.camera) document.getElementById('exifCameraInput').value = exifData.camera;
+            if (exifData.focal) document.getElementById('exifFocalInput').value = exifData.focal;
             if (exifData.aperture) document.getElementById('exifApertureInput').value = exifData.aperture;
             if (exifData.shutter) document.getElementById('exifShutterInput').value = exifData.shutter;
             if (exifData.iso) document.getElementById('exifIsoInput').value = exifData.iso;
 
-            const parts = [exifData.aperture, exifData.shutter, exifData.iso].filter(Boolean);
+            const parts = [exifData.camera, exifData.focal, exifData.aperture, exifData.shutter, exifData.iso].filter(Boolean);
             const badge = document.getElementById('exifStatusBadge');
             if (badge) {
                 if (parts.length > 0) {
-                    badge.textContent = '✓ Udlæst fra foto (' + parts.join(' · ') + ')';
+                    badge.textContent = '✓ Udlæst fra foto';
                     badge.style.color = 'var(--accent-red)';
                 } else {
-                    badge.textContent = 'Ingen EXIF fundet i fil – indtast evt. manuelt';
+                    badge.textContent = 'Ingen EXIF i fil – indtast evt. manuelt';
                     badge.style.color = 'var(--text-muted)';
                 }
             }
@@ -1249,68 +1567,43 @@ async function handleImageSelected(e) {
                 }
             }
 
-            // Hvis fotoet indeholder GPS-koordinater
-            if (exifData.latitude && exifData.longitude) {
+            // Hvis fotoet indeholder GPS-koordinater, sæt koordinater OG slå automatisk stednavn op!
+            if (typeof exifData.latitude === 'number' && typeof exifData.longitude === 'number') {
                 document.getElementById('latInput').value = exifData.latitude;
                 document.getElementById('lonInput').value = exifData.longitude;
+                reverseGeocodeCoords(exifData.latitude, exifData.longitude, true);
             }
         }
     } catch (err) {
         console.warn('EXIF udtræk bemærkning:', err);
     }
 
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        const img = new Image();
-        img.onload = function() {
-            // Skaler billedet ned til max 2048px for lynhurtig upload
-            const maxDimension = 2048;
-            let width = img.width;
-            let height = img.height;
+    // 2. Skaler til 2400px @ 92% JPEG
+    try {
+        const res = await compressImageFileToDataUrl(file);
+        compressedImageData = res.dataUrl;
 
-            if (width > maxDimension || height > maxDimension) {
-                if (width > height) {
-                    height = Math.round((height * maxDimension) / width);
-                    width = maxDimension;
-                } else {
-                    width = Math.round((width * maxDimension) / height);
-                    height = maxDimension;
-                }
-            }
+        const preview = document.getElementById('imagePreview');
+        preview.src = compressedImageData;
+        preview.style.display = 'block';
+        document.getElementById('photoPickerPrompt').style.display = 'none';
 
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-
-            // Komprimer til JPEG med 85% kvalitet
-            compressedImageData = canvas.toDataURL('image/jpeg', 0.85);
-
-            // Vis preview
-            const preview = document.getElementById('imagePreview');
-            preview.src = compressedImageData;
-            preview.style.display = 'block';
-            document.getElementById('photoPickerPrompt').style.display = 'none';
-
-            // Beregn størrelse
-            const approxSizeKb = Math.round((compressedImageData.length * 3/4) / 1024);
-            const info = document.getElementById('imageResInfo');
-            info.textContent = `Optimeret til: ${width}x${height}px (~${approxSizeKb} KB)`;
-            info.style.display = 'block';
-        };
-        img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
+        const info = document.getElementById('imageResInfo');
+        info.textContent = `Optimeret: ${res.width}×${res.height}px (92% kvalitet · ~${res.approxSizeKb} KB)`;
+        info.style.display = 'block';
+    } catch (err) {
+        showAlert(err.message || 'Kunne ikke indlæse billede', 'error');
+    }
 }
 
-// Tags håndtering i Compose
+// Tags håndtering i Compose (Sikker DOM-håndtering via data-tag attributter i stedet for inline JS-strenge)
 async function loadRecentTags() {
     try {
         const res = await apiFetch('get_tags');
         if (res && res.tags) {
             recentTagsList = res.tags;
             renderRecentTags();
+            renderEditRecentTags();
         }
     } catch (e) {
         console.warn('Kunne ikke hente tags:', e);
@@ -1330,11 +1623,18 @@ function renderRecentTags() {
         return `
             <button type="button" 
                     class="recent-tag-chip ${isSelected ? 'active' : ''}" 
-                    onclick="toggleTag('${escapeHtml(t.name)}')">
+                    data-tag="${escapeHtml(t.name)}">
                 #${escapeHtml(t.name)} ${isSelected ? '✓' : ''}
             </button>
         `;
     }).join('');
+
+    container.querySelectorAll('.recent-tag-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tag = btn.getAttribute('data-tag');
+            if (tag) toggleTag(tag);
+        });
+    });
 }
 
 function renderSelectedTags() {
@@ -1349,9 +1649,16 @@ function renderSelectedTags() {
     container.innerHTML = selectedTags.map(t => `
         <span class="tag-badge">
             #${escapeHtml(t)}
-            <span class="btn-remove-tag" onclick="removeTag('${escapeHtml(t)}')" title="Fjern">&times;</span>
+            <button type="button" class="btn-remove-tag" data-tag="${escapeHtml(t)}" title="Fjern">&times;</button>
         </span>
     `).join('');
+
+    container.querySelectorAll('.btn-remove-tag').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tag = btn.getAttribute('data-tag');
+            if (tag) removeTag(tag);
+        });
+    });
 
     renderRecentTags();
 }
@@ -1369,11 +1676,13 @@ function addTag(rawTag) {
     }
     selectedTags.push(tag);
     renderSelectedTags();
+    saveDraft();
 }
 
 function removeTag(tag) {
     selectedTags = selectedTags.filter(t => t.toLowerCase() !== tag.toLowerCase());
     renderSelectedTags();
+    saveDraft();
 }
 
 function toggleTag(tag) {
@@ -1400,20 +1709,61 @@ function handleTagInputKey(e) {
     }
 }
 
-// Tags håndtering i Edit modal
+// Tags håndtering i Edit modal (inkl. klikbare tidligere tags)
+function renderEditRecentTags() {
+    const container = document.getElementById('editRecentTagsContainer');
+    if (!container) return;
+    if (recentTagsList.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = recentTagsList.map(t => {
+        const isSelected = editSelectedTags.some(st => st.toLowerCase() === t.name.toLowerCase());
+        return `
+            <button type="button"
+                    class="recent-tag-chip ${isSelected ? 'active' : ''}"
+                    data-tag="${escapeHtml(t.name)}">
+                #${escapeHtml(t.name)} ${isSelected ? '✓' : ''}
+            </button>
+        `;
+    }).join('');
+
+    container.querySelectorAll('.recent-tag-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tag = btn.getAttribute('data-tag');
+            if (!tag) return;
+            if (editSelectedTags.some(t => t.toLowerCase() === tag.toLowerCase())) {
+                removeEditTag(tag);
+            } else {
+                addEditTag(tag);
+            }
+        });
+    });
+}
+
 function renderEditSelectedTags() {
     const container = document.getElementById('editSelectedTagsContainer');
     if (!container) return;
     if (editSelectedTags.length === 0) {
         container.innerHTML = '<span style="font-size: 12px; color: var(--text-muted); font-style: italic;">Ingen tags</span>';
+        renderEditRecentTags();
         return;
     }
     container.innerHTML = editSelectedTags.map(t => `
         <span class="tag-badge">
             #${escapeHtml(t)}
-            <span class="btn-remove-tag" onclick="removeEditTag('${escapeHtml(t)}')">&times;</span>
+            <button type="button" class="btn-remove-tag" data-tag="${escapeHtml(t)}">&times;</button>
         </span>
     `).join('');
+
+    container.querySelectorAll('.btn-remove-tag').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tag = btn.getAttribute('data-tag');
+            if (tag) removeEditTag(tag);
+        });
+    });
+
+    renderEditRecentTags();
 }
 
 function addEditTag(rawTag) {
@@ -1449,7 +1799,7 @@ function handleEditTagInputKey(e) {
     }
 }
 
-// Hent GPS Lokation & Reverse Geocoding
+// Hent telefonens aktuelle GPS Lokation
 function fetchGPSLocation() {
     const btn = document.getElementById('gpsBtn');
     const icon = document.getElementById('gpsIcon');
@@ -1471,37 +1821,19 @@ function fetchGPSLocation() {
             document.getElementById('lonInput').value = lon;
 
             try {
-                // Hent by/område via OpenStreetMap Nominatim
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1`, {
-                    headers: { 'Accept-Language': 'da, en' }
-                });
-                const data = await res.json();
-                
-                if (data && data.address) {
-                    const addr = data.address;
-                    const city = addr.city || addr.town || addr.village || addr.municipality || '';
-                    const district = addr.suburb || addr.neighbourhood || addr.quarter || '';
-                    
-                    let locName = '';
-                    if (city && district && city !== district) {
-                        locName = `${city}, ${district}`;
-                    } else {
-                        locName = city || district || 'Danmark';
-                    }
-                    locInput.value = locName;
-                    showAlert(`📍 Lokation fundet: ${locName}`, 'success', 2500);
+                const locName = await reverseGeocodeCoords(lat, lon, false);
+                if (locName) {
+                    showAlert(`⌖ Lokation fundet: ${locName}`, 'success', 2500);
                 } else {
                     locInput.value = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
                 }
-            } catch (err) {
-                locInput.value = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
             } finally {
-                icon.textContent = '📍';
+                icon.textContent = '⌖';
                 btn.disabled = false;
             }
         },
         (error) => {
-            icon.textContent = '📍';
+            icon.textContent = '⌖';
             btn.disabled = false;
             showAlert('Kunne ikke hente GPS: ' + error.message, 'error');
         },
@@ -1531,6 +1863,8 @@ async function handleCreatePost(e) {
         published_at: document.getElementById('dateInput').value,
         image_data: compressedImageData,
         tags: selectedTags,
+        exif_camera: (document.getElementById('exifCameraInput')?.value || '').trim(),
+        exif_focal: (document.getElementById('exifFocalInput')?.value || '').trim(),
         exif_aperture: (document.getElementById('exifApertureInput')?.value || '').trim(),
         exif_shutter: (document.getElementById('exifShutterInput')?.value || '').trim(),
         exif_iso: (document.getElementById('exifIsoInput')?.value || '').trim()
@@ -1548,7 +1882,10 @@ async function handleCreatePost(e) {
             compressedImageData = null;
             currentExifData = null;
             selectedTags = [];
+            clearDraft(false);
             renderSelectedTags();
+            document.getElementById('exifCameraInput').value = '';
+            document.getElementById('exifFocalInput').value = '';
             document.getElementById('exifApertureInput').value = '';
             document.getElementById('exifShutterInput').value = '';
             document.getElementById('exifIsoInput').value = '';
@@ -1558,9 +1895,10 @@ async function handleCreatePost(e) {
                 exifBadge.style.color = 'var(--text-muted)';
             }
             const dateBadge = document.getElementById('dateOriginBadge');
-            if (dateBadge) {
-                dateBadge.textContent = '';
-            }
+            if (dateBadge) dateBadge.textContent = '';
+            const locBadge = document.getElementById('locOriginBadge');
+            if (locBadge) locBadge.textContent = '';
+
             document.getElementById('imagePreview').style.display = 'none';
             document.getElementById('photoPickerPrompt').style.display = 'block';
             document.getElementById('imageResInfo').style.display = 'none';
@@ -1575,53 +1913,167 @@ async function handleCreatePost(e) {
     }
 }
 
-// Hent liste af indlæg til historik/redigering
-async function loadPostsHistory() {
+// Historik-søgning, paginering og manglende datoer
+let historyOffset = 0;
+const HISTORY_LIMIT = 50;
+let historySearchTimer = null;
+
+function handleHistorySearchInput() {
+    clearTimeout(historySearchTimer);
+    historySearchTimer = setTimeout(() => {
+        loadPostsHistory(true);
+    }, 250);
+}
+
+function loadMoreHistory() {
+    historyOffset += HISTORY_LIMIT;
+    loadPostsHistory(false);
+}
+
+function prefillComposeDate(dateIso) {
+    switchView('compose');
+    document.getElementById('dateInput').value = dateIso + 'T12:00';
+    const dateBadge = document.getElementById('dateOriginBadge');
+    if (dateBadge) {
+        dateBadge.textContent = 'Dato valgt: ' + dateIso;
+        dateBadge.style.color = 'var(--accent-red)';
+    }
+    showAlert('Dato sat til ' + dateIso + ' – når du vælger et foto, opdateres klokkeslættet fra EXIF.', 'success', 3500);
+}
+
+async function loadPostsHistory(reset = true) {
     const container = document.getElementById('postsListContainer');
-    container.innerHTML = '<p style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">Henter indlæg...</p>';
+    const loadMoreBtn = document.getElementById('loadMoreHistoryBtn');
+    const totalLabel = document.getElementById('historyTotalLabel');
+    const q = (document.getElementById('historySearchInput')?.value || '').trim();
+
+    if (reset) {
+        historyOffset = 0;
+        container.innerHTML = '<p style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">Henter indlæg...</p>';
+    }
 
     try {
-        const data = await apiFetch('get_posts');
-        if (data && data.posts) {
-            if (data.posts.length === 0) {
-                container.innerHTML = '<p style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">Ingen indlæg oprettet endnu.</p>';
+        const data = await apiFetch('get_posts', {
+            params: { q: q, limit: HISTORY_LIMIT, offset: historyOffset }
+        });
+
+        // Vis manglende dage (seneste 14 dage) i toppen af Historik-fanen
+        const missingBox = document.getElementById('missingDatesBox');
+        const missingChips = document.getElementById('missingDatesChips');
+        if (missingBox && missingChips && Array.isArray(data.missing_recent_dates)) {
+            if (data.missing_recent_dates.length > 0 && !q) {
+                missingBox.style.display = 'block';
+                missingChips.innerHTML = data.missing_recent_dates.map(d => `
+                    <button type="button" class="missing-date-chip" data-date="${escapeHtml(d.date_iso)}">
+                        + ${escapeHtml(d.label)}
+                    </button>
+                `).join('');
+                missingChips.querySelectorAll('.missing-date-chip').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const dIso = btn.getAttribute('data-date');
+                        if (dIso) prefillComposeDate(dIso);
+                    });
+                });
+            } else {
+                missingBox.style.display = 'none';
+            }
+        }
+
+        if (totalLabel && typeof data.total === 'number') {
+            totalLabel.textContent = `${data.total} indlæg i alt`;
+        }
+
+        if (data && Array.isArray(data.posts)) {
+            if (reset && data.posts.length === 0) {
+                container.innerHTML = '<p style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">Ingen indlæg fundet.</p>';
+                if (loadMoreBtn) loadMoreBtn.style.display = 'none';
                 return;
             }
 
             let html = '';
             data.posts.forEach(p => {
-                const imgUrl = '../uploads/' + p.image_path;
-                const dateStr = p.published_at.substring(0, 10);
+                const imgUrl = '../uploads/' + encodeURIComponent(p.image_path);
+                const dateStr = (p.published_at || '').substring(0, 10);
                 const tagNames = (p.tags || []).map(t => '#' + t.name).join(' ');
+                const postIdentifier = encodeURIComponent(p.uid || p.id);
                 html += `
-                    <div class="history-item" id="hist-${p.id}">
+                    <div class="history-item" id="hist-${Number(p.id)}">
                         <img src="${imgUrl}" class="history-thumb" alt="">
                         <div class="history-info">
                             <div class="history-title">${escapeHtml(p.title)}</div>
-                            <div class="history-date">[${dateStr}] ${p.location ? '• ' + escapeHtml(p.location) : ''}</div>
+                            <div class="history-date">[${escapeHtml(dateStr)}] ${p.location ? '• ' + escapeHtml(p.location) : ''}</div>
                             ${tagNames ? `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(tagNames)}</div>` : ''}
                         </div>
                         <div class="history-actions">
-                            <a href="../post.php?p=${p.uid || p.id}" target="_blank" class="btn-small" style="text-decoration:none;">Vis</a>
-                            <button onclick="openEditModal(${p.id})" class="btn-small">Rediger</button>
-                            <button onclick="deletePost(${p.id})" class="btn-small btn-danger">Slet</button>
+                            <a href="../post.php?p=${postIdentifier}" target="_blank" class="btn-small" style="text-decoration:none;">Vis</a>
+                            <button type="button" onclick="openEditModal(${Number(p.id)})" class="btn-small">Rediger</button>
+                            <button type="button" onclick="deletePost(${Number(p.id)})" class="btn-small btn-danger">Slet</button>
                         </div>
                     </div>
                 `;
             });
-            container.innerHTML = html;
+
+            if (reset) {
+                container.innerHTML = html;
+            } else {
+                container.insertAdjacentHTML('beforeend', html);
+            }
+
+            if (loadMoreBtn) {
+                const shownCount = historyOffset + data.posts.length;
+                loadMoreBtn.style.display = (shownCount < (data.total || 0)) ? 'block' : 'none';
+            }
         }
     } catch (e) {
-        container.innerHTML = `<p style="color: var(--accent-red);">${e.message || 'Kunne ikke hente indlæg'}</p>`;
+        if (reset) {
+            container.innerHTML = `<p style="color: var(--accent-red);">${escapeHtml(e.message || 'Kunne ikke hente indlæg')}</p>`;
+        }
+    }
+}
+
+// Billedskift i Rediger-modalen
+async function handleEditImageSelected(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+        const res = await compressImageFileToDataUrl(file);
+        editCompressedImageData = res.dataUrl;
+        document.getElementById('editImagePreview').src = editCompressedImageData;
+        document.getElementById('editImageStatus').textContent = `✓ Nyt foto valgt (${res.width}×${res.height}px · ~${res.approxSizeKb} KB)`;
+
+        const exifData = await extractExifFromFile(file);
+        if (exifData) {
+            if (exifData.camera && !document.getElementById('editExifCamera').value) {
+                document.getElementById('editExifCamera').value = exifData.camera;
+            }
+            if (exifData.focal && !document.getElementById('editExifFocal').value) {
+                document.getElementById('editExifFocal').value = exifData.focal;
+            }
+            if (exifData.aperture) document.getElementById('editExifAperture').value = exifData.aperture;
+            if (exifData.shutter) document.getElementById('editExifShutter').value = exifData.shutter;
+            if (exifData.iso) document.getElementById('editExifIso').value = exifData.iso;
+        }
+    } catch (err) {
+        showAlert(err.message || 'Kunne ikke indlæse nyt billede', 'error');
     }
 }
 
 // Rediger indlæg modal logik
 async function openEditModal(id) {
     try {
+        if (recentTagsList.length === 0) {
+            await loadRecentTags();
+        }
         const data = await apiFetch('get_post', { params: { id: id } });
         if (!data || !data.post) return;
         const p = data.post;
+
+        editCompressedImageData = null;
+        document.getElementById('editFileInput').value = '';
+        document.getElementById('editImagePreview').src = '../uploads/' + encodeURIComponent(p.image_path);
+        document.getElementById('editImageStatus').textContent = 'Behold nuværende foto, eller vælg et nyt';
+
         document.getElementById('editPostId').value = p.id;
         document.getElementById('editTitleInput').value = p.title || '';
         document.getElementById('editLocInput').value = p.location || '';
@@ -1635,6 +2087,8 @@ async function openEditModal(id) {
         editSelectedTags = (p.tags || []).map(t => t.name);
         renderEditSelectedTags();
 
+        document.getElementById('editExifCamera').value = p.exif_camera || '';
+        document.getElementById('editExifFocal').value = p.exif_focal || '';
         document.getElementById('editExifAperture').value = p.exif_aperture || '';
         document.getElementById('editExifShutter').value = p.exif_shutter || '';
         document.getElementById('editExifIso').value = p.exif_iso || '';
@@ -1664,10 +2118,16 @@ async function handleSaveEdit(e) {
         content: document.getElementById('editContentInput').value,
         published_at: document.getElementById('editDateInput').value,
         tags: editSelectedTags,
+        exif_camera: document.getElementById('editExifCamera').value,
+        exif_focal: document.getElementById('editExifFocal').value,
         exif_aperture: document.getElementById('editExifAperture').value,
         exif_shutter: document.getElementById('editExifShutter').value,
         exif_iso: document.getElementById('editExifIso').value
     };
+
+    if (editCompressedImageData) {
+        payload.image_data = editCompressedImageData;
+    }
 
     try {
         const data = await apiFetch('update_post', {
@@ -1677,7 +2137,7 @@ async function handleSaveEdit(e) {
         if (data.success) {
             showAlert('✓ Indlæg opdateret!', 'success', 3000);
             closeEditModal();
-            loadPostsHistory();
+            loadPostsHistory(true);
             loadRecentTags();
         }
     } catch (err) {
@@ -1749,6 +2209,41 @@ async function toggleLockdown() {
     }
 }
 
+// Download database backup via POST + Bearer token
+async function downloadDatabaseBackup() {
+    const btn = document.getElementById('btnBackupDb');
+    if (btn) btn.disabled = true;
+    try {
+        const token = localStorage.getItem('logbog_token') || '';
+        const res = await fetch('api.php?action=backup', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ token })
+        });
+        if (!res.ok) {
+            throw new Error('Kunne ikke hente backup (' + res.status + ')');
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `logbog_backup_${dateStr}.db`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showAlert('✓ Backup downloadet', 'success', 2500);
+    } catch (e) {
+        showAlert(e.message || 'Fejl under backup', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
 // Opdater PIN
 async function handleUpdatePin(e) {
     e.preventDefault();
@@ -1760,6 +2255,9 @@ async function handleUpdatePin(e) {
             body: { new_pin: newPin }
         });
         if (data.success) {
+            if (data.token) {
+                localStorage.setItem('logbog_token', data.token);
+            }
             showAlert('✓ PIN-koden er ændret!', 'success', 3000);
             document.getElementById('newPinInput').value = '';
         }
@@ -1768,10 +2266,25 @@ async function handleUpdatePin(e) {
     }
 }
 
+// Ugyldiggør andre enheders sessioner
+async function handleRevokeSessions() {
+    try {
+        const data = await apiFetch('revoke_sessions', { method: 'POST' });
+        if (data.success) {
+            if (data.token) {
+                localStorage.setItem('logbog_token', data.token);
+            }
+            showAlert('✓ ' + data.message, 'success', 3500);
+        }
+    } catch (e) {
+        showAlert(e.message || 'Fejl', 'error');
+    }
+}
+
 // Log ud
 async function handleLogout() {
     try {
-        await apiFetch('logout');
+        await apiFetch('logout', { method: 'POST' });
     } catch (e) {}
     localStorage.removeItem('logbog_token');
     switchView('login');

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Kraft-omslag med mørk kant -->
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="#b86940" stroke="#753b1b" stroke-width="3"/>
+  <!-- Manila-papirark -->
+  <rect x="9" y="8" width="46" height="48" rx="4" fill="#fbf7ee" stroke="#181513" stroke-width="2"/>
+  <!-- Dobbelt retro header-linje (The Spiral / Collegiate) -->
+  <line x1="14" y1="15" x2="50" y2="15" stroke="#181513" stroke-width="2.5"/>
+  <line x1="14" y1="18.5" x2="50" y2="18.5" stroke="#181513" stroke-width="1"/>
+  <!-- Kamera-søger / Blænde-optik i sort blæk -->
+  <circle cx="32" cy="36" r="12" fill="none" stroke="#181513" stroke-width="3"/>
+  <circle cx="32" cy="36" r="5" fill="#181513"/>
+  <!-- Rødt farvebånd / målsøger-prik (Leica Red Dot / Rødt stempel) -->
+  <circle cx="44.5" cy="24.5" r="3.5" fill="#b53424"/>
+</svg>

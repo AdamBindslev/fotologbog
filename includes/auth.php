@@ -6,54 +6,94 @@
 require_once __DIR__ . '/db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
+    $isSecure = (
+        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+        (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
+        (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+    );
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $isSecure,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
     session_start();
 }
 
 /**
- * Henter klientens IP-adresse
+ * Henter klientens IP-adresse sikkert.
+ * Bruger udelukkende REMOTE_ADDR for at forhindre at angribere omgår brute-force spærring
+ * ved at forfalske HTTP_X_FORWARDED_FOR eller HTTP_CF_CONNECTING_IP headers.
  */
 function get_client_ip(): string {
-    $headers = ['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'];
-    foreach ($headers as $h) {
-        if (!empty($_SERVER[$h])) {
-            $ips = explode(',', $_SERVER[$h]);
-            return trim($ips[0]);
-        }
-    }
-    return '127.0.0.1';
+    $ip = trim((string)($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'));
+    return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '127.0.0.1';
 }
 
 /**
- * Tjekker om IP-adressen er blokeret pga. for mange forkerte loginforsøg (5 forsøg inden for 15 min)
+ * Tjekker om IP-adressen (eller systemet globalt) er blokeret pga. for mange forkerte loginforsøg
  */
 function is_ip_rate_limited(string $ip): array {
     $db = get_db();
+    $lockoutSeconds = 900; // 15 minutter
+
+    // 1. Tjek specifik IP (maks 5 forsøg)
     $stmt = $db->prepare("SELECT attempts, last_attempt FROM login_attempts WHERE ip = :ip");
     $stmt->execute([':ip' => $ip]);
     $row = $stmt->fetch();
 
     if ($row) {
-        $lockoutSeconds = 900; // 15 minutter
         $timeSinceLast = time() - (int)$row['last_attempt'];
         if ((int)$row['attempts'] >= 5) {
             if ($timeSinceLast < $lockoutSeconds) {
-                $waitMinutes = ceil(($lockoutSeconds - $timeSinceLast) / 60);
+                $waitMinutes = (int)ceil(($lockoutSeconds - $timeSinceLast) / 60);
                 return ['blocked' => true, 'wait_minutes' => $waitMinutes];
             } else {
-                // Tiden er udløbet, nulstil
                 clear_failed_logins($ip);
             }
         }
     }
+
+    // 2. Tjek global grænse på tværs af IP'er (maks 15 fejlforsøg på 15 min mod distribueret brute-force)
+    $stmtGlobal = $db->prepare("SELECT attempts, last_attempt FROM login_attempts WHERE ip = '__global__'");
+    $stmtGlobal->execute();
+    $globalRow = $stmtGlobal->fetch();
+
+    if ($globalRow) {
+        $timeSinceGlobal = time() - (int)$globalRow['last_attempt'];
+        if ((int)$globalRow['attempts'] >= 15) {
+            if ($timeSinceGlobal < $lockoutSeconds) {
+                $waitMinutes = (int)ceil(($lockoutSeconds - $timeSinceGlobal) / 60);
+                return ['blocked' => true, 'wait_minutes' => $waitMinutes];
+            } else {
+                clear_failed_logins('__global__');
+            }
+        }
+    }
+
     return ['blocked' => false, 'wait_minutes' => 0];
 }
 
 /**
- * Registrerer et mislykket loginforsøg
+ * Registrerer et mislykket loginforsøg for både IP og globalt
  */
 function record_failed_login(string $ip): int {
     $db = get_db();
     $now = time();
+
+    // Opdater global tæller
+    $stmtG = $db->prepare("SELECT attempts FROM login_attempts WHERE ip = '__global__'");
+    $stmtG->execute();
+    if ($stmtG->fetchColumn() !== false) {
+        $db->prepare("UPDATE login_attempts SET attempts = attempts + 1, last_attempt = :now WHERE ip = '__global__'")
+           ->execute([':now' => $now]);
+    } else {
+        $db->prepare("INSERT INTO login_attempts (ip, attempts, last_attempt) VALUES ('__global__', 1, :now)")
+           ->execute([':now' => $now]);
+    }
+
+    // Opdater IP-tæller
     $stmt = $db->prepare("SELECT attempts FROM login_attempts WHERE ip = :ip");
     $stmt->execute([':ip' => $ip]);
     $current = $stmt->fetchColumn();
@@ -79,6 +119,60 @@ function clear_failed_logins(string $ip): void {
 }
 
 /**
+ * Henter den kryptografiske nøgle fra databasen
+ */
+function get_auth_secret(): string {
+    static $secret = null;
+    if ($secret !== null) {
+        return $secret;
+    }
+    try {
+        $db = get_db();
+        $stmt = $db->prepare("SELECT value FROM settings WHERE key = 'auth_secret' LIMIT 1");
+        $stmt->execute();
+        $val = $stmt->fetchColumn();
+        if (is_string($val) && strlen($val) >= 32) {
+            $secret = $val;
+            return $secret;
+        }
+        $newSec = bin2hex(random_bytes(32));
+        $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('auth_secret', :sec)")
+           ->execute([':sec' => $newSec]);
+        $secret = $newSec;
+        return $secret;
+    } catch (Throwable $e) {
+        return AUTH_SECRET;
+    }
+}
+
+/**
+ * Henter aktuel token-version (bruges til at kunne ugyldiggøre gamle tokens)
+ */
+function get_token_version(): string {
+    try {
+        $db = get_db();
+        $stmt = $db->prepare("SELECT value FROM settings WHERE key = 'token_version' LIMIT 1");
+        $stmt->execute();
+        $val = $stmt->fetchColumn();
+        return $val ? (string)$val : '1';
+    } catch (Throwable $e) {
+        return '1';
+    }
+}
+
+/**
+ * Roterer token-version og auth_secret, så alle eksisterende tokens på andre enheder ugyldiggøres
+ */
+function revoke_all_tokens(): void {
+    $db = get_db();
+    $nextVer = (string)(((int)get_token_version()) + 1);
+    $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('token_version', :v)")
+       ->execute([':v' => $nextVer]);
+    $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('auth_secret', :sec)")
+       ->execute([':sec' => bin2hex(random_bytes(32))]);
+}
+
+/**
  * Tjekker om "Lockdown Mode" er slået til (blokerer alle nye logins)
  */
 function is_lockdown_enabled(): bool {
@@ -100,7 +194,8 @@ function set_lockdown(bool $enabled): bool {
 }
 
 /**
- * Validerer en indtastet PIN-kode
+ * Validerer en indtastet PIN-kode.
+ * VIGTIGT: Falder ALDRIG tilbage til DEFAULT_PIN, når der findes en PIN i databasen!
  */
 function verify_pin(string $input_pin): bool {
     $db = get_db();
@@ -109,18 +204,11 @@ function verify_pin(string $input_pin): bool {
     $row = $stmt->fetch();
 
     if ($row && !empty($row['value'])) {
-        // Tjek om det matcher hashed PIN
-        if (password_verify($input_pin, $row['value'])) {
-            return true;
-        }
+        return password_verify($input_pin, $row['value']);
     }
 
-    // Fallback hvis standard-PIN er sat i config.php
-    if ($input_pin === DEFAULT_PIN) {
-        return true;
-    }
-
-    return false;
+    // Kun hvis settings-tabellen af uforklarlige årsager slet ikke har en 'pin'-række endnu
+    return hash_equals((string)DEFAULT_PIN, $input_pin);
 }
 
 /**
@@ -141,40 +229,62 @@ function update_pin(string $new_pin): bool {
  */
 function generate_auth_token(): string {
     $expires = time() + (86400 * 365); // 365 dage
-    $data = 'auth_ok:' . $expires;
-    $signature = hash_hmac('sha256', $data, AUTH_SECRET);
+    $version = get_token_version();
+    $data = 'auth_ok:' . $version . ':' . $expires;
+    $signature = hash_hmac('sha256', $data, get_auth_secret());
     return base64_encode($data . ':' . $signature);
 }
 
 /**
- * Validerer en auth-token
+ * Validerer en auth-token med konstant-tids sammenligning og versions-tjek
  */
 function validate_auth_token(?string $token): bool {
     if (empty($token)) {
         return false;
     }
-    $decoded = base64_decode($token);
+    $decoded = base64_decode($token, true);
     if (!$decoded) {
         return false;
     }
     $parts = explode(':', $decoded);
-    if (count($parts) !== 3) {
+    if (count($parts) !== 4) {
         return false;
     }
-    [$prefix, $expires, $signature] = $parts;
+    [$prefix, $version, $expires, $signature] = $parts;
     if ($prefix !== 'auth_ok') {
+        return false;
+    }
+    if (!hash_equals(get_token_version(), (string)$version)) {
         return false;
     }
     if ((int)$expires < time()) {
         return false; // Udløbet
     }
-    $data = $prefix . ':' . $expires;
-    $expectedSignature = hash_hmac('sha256', $data, AUTH_SECRET);
+    $data = $prefix . ':' . $version . ':' . $expires;
+    $expectedSignature = hash_hmac('sha256', $data, get_auth_secret());
     return hash_equals($expectedSignature, $signature);
 }
 
 /**
- * Tjekker om den aktuelle anmoder er logget ind (via session, cookie, header eller payload)
+ * Sætter eller sletter logbog_token-cookien ensartet
+ */
+function set_auth_cookie(string $token, int $expiresTimestamp): void {
+    $isSecure = (
+        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+        (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
+        (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+    );
+    setcookie('logbog_token', $token, [
+        'expires' => $expiresTimestamp,
+        'path' => '/',
+        'secure' => $isSecure,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+}
+
+/**
+ * Tjekker om den aktuelle anmoder er logget ind (via session, cookie, header eller POST payload)
  */
 function is_authenticated(): bool {
     // 1. Session check
@@ -202,10 +312,11 @@ function is_authenticated(): bool {
         }
     }
 
-    // 4. Token parameter i JSON body, POST eller GET
+    // 4. Token parameter i JSON body eller POST (GET-token tillades kun ved GET-requests)
     global $input;
-    $inputToken = $input['token'] ?? $_POST['token'] ?? $_GET['token'] ?? '';
-    if (!empty($inputToken) && validate_auth_token($inputToken)) {
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $inputToken = $input['token'] ?? $_POST['token'] ?? ($method === 'GET' ? ($_GET['token'] ?? '') : '');
+    if (!empty($inputToken) && validate_auth_token((string)$inputToken)) {
         $_SESSION['logged_in'] = true;
         return true;
     }
