@@ -3,6 +3,8 @@
  * Logbog – Dynamisk Social Share / Open Graph Image Generator (1200 x 630)
  * 
  * Genererer autentiske, rolige og æstetiske delingskort uden marketing-støj eller CTA-tricks.
+ * Fuld support for nordiske karakterer (æ, ø, å, Æ, Ø, Å) på tværs af PHP GD og FreeType.
+ * 
  * Understøtter 4 stilarter valgt per indlæg:
  *  - polaroid: Klassisk hvid/creme polaroidramme på mørkt træbord med titel og stempel
  *  - darkroom: 35mm filmnegativ med perforeringer, filmmarkeringer og EXIF
@@ -55,7 +57,9 @@ if (!is_dir($cacheDir)) {
 $cacheFile = $cacheDir . '/' . $safeUid . '_' . $style . '.jpg';
 $postTime = !empty($post['updated_at']) ? strtotime($post['updated_at']) : strtotime($post['published_at'] ?? 'now');
 $sourceTime = filemtime($sourceFile);
-$refTime = max($postTime, $sourceTime);
+$scriptTime = filemtime(__FILE__);
+// Hvis enten indlæg, kildebillede eller genereringsscriptet er opdateret, regenereres kortet
+$refTime = max($postTime, $sourceTime, $scriptTime);
 
 // Tjek om gyldigt cachet billede allerede findes
 $noCache = isset($_GET['nocache']);
@@ -135,6 +139,67 @@ imagedestroy($canvas);
 exit;
 
 // =========================================================================
+// TEKST- OG NORDISK KARAKTER-HÅNDTERING
+// =========================================================================
+
+/**
+ * Konverterer UTF-8 tekst til numeriske tegnreferencer (&#...;), som FreeType i GD altid forstår fejlfrit.
+ * Dette sikrer, at æ, ø, å, Æ, Ø, Å, é osv. altid gengives korrekt uanset server-locale og FreeType-version.
+ */
+function to_gd_text(?string $text): string {
+    if ($text === null || $text === '') {
+        return '';
+    }
+    // 1. Afkod eventuelle HTML-entiteter (hvis teksten f.eks. indeholder &amp; eller &oslash;)
+    $clean = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    // 2. Konverter alle non-ASCII tegn (>= 128) til numeriske HTML-entiteter (&#230; osv.)
+    // FreeType i GD oversætter automatisk numeriske entiteter direkte til Unicode-glyffen i skrifttypen
+    if (function_exists('mb_encode_numericentity')) {
+        return mb_encode_numericentity($clean, [0x80, 0x10ffff, 0, 0x10ffff], 'UTF-8');
+    }
+
+    return preg_replace_callback('/[\x80-\x{10ffff}]/u', function ($m) {
+        $char = $m[0];
+        $codepoint = 0;
+        $len = strlen($char);
+        if ($len === 2) {
+            $codepoint = ((ord($char[0]) & 0x1f) << 6) | (ord($char[1]) & 0x3f);
+        } elseif ($len === 3) {
+            $codepoint = ((ord($char[0]) & 0x0f) << 12) | ((ord($char[1]) & 0x3f) << 6) | (ord($char[2]) & 0x3f);
+        } elseif ($len === 4) {
+            $codepoint = ((ord($char[0]) & 0x07) << 18) | ((ord($char[1]) & 0x3f) << 12) | ((ord($char[2]) & 0x3f) << 6) | (ord($char[3]) & 0x3f);
+        }
+        return '&#' . $codepoint . ';';
+    }, $clean);
+}
+
+/**
+ * Fallback til indbyggede GD bitmap-skrifttyper (imagestring), som kun understøtter ISO-8859-1 (Latin-1).
+ */
+function to_latin_text(?string $text): string {
+    if ($text === null || $text === '') {
+        return '';
+    }
+    $clean = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    return mb_convert_encoding($clean, 'ISO-8859-1', 'UTF-8');
+}
+
+/**
+ * Tegner en tekstlinje robust med FreeType, eller falder pænt tilbage til imagestring
+ */
+function gd_draw_single_line($canvas, ?string $fontFile, int $fontSize, int $x, int $y, int $color, string $text): void {
+    if ($fontFile && is_file($fontFile) && function_exists('imagettftext')) {
+        @imagettftext($canvas, $fontSize, 0, $x, $y, $color, $fontFile, to_gd_text($text));
+    } else {
+        $latin = to_latin_text($text);
+        $gdFont = $fontSize >= 16 ? 5 : ($fontSize >= 12 ? 4 : 3);
+        $fontH = imagefontheight($gdFont);
+        imagestring($canvas, $gdFont, $x, max(0, $y - $fontH), $latin, $color);
+    }
+}
+
+// =========================================================================
 // STILART 1: POLAROID
 // =========================================================================
 function render_polaroid_style($canvas, $srcImg, array $post, array $fonts): void {
@@ -196,16 +261,11 @@ function render_polaroid_style($canvas, $srcImg, array $post, array $fonts): voi
     // Titel i typewriter/skrivemaskine skrift
     $inkColor = imagecolorallocate($canvas, 26, 23, 21);
     $fontTitle = is_file($fonts['courier_bold']) ? $fonts['courier_bold'] : null;
-
-    if ($fontTitle) {
-        @imagettftext($canvas, 18, 0, $photoX + 4, $chinY + 54, $inkColor, $fontTitle, $title);
-    } else {
-        imagestring($canvas, 5, $photoX + 4, $chinY + 38, $title, $inkColor);
-    }
+    gd_draw_single_line($canvas, $fontTitle, 18, $photoX + 4, $chinY + 54, $inkColor, $title);
 
     // Dato- og stedstempel i terracotta/rød blæk (roligt og diskret i hjørnet)
     $dateStr = format_stamp_date($post['published_at']);
-    $locStr = !empty($post['location']) ? ' · ' . mb_strtoupper($post['location'], 'UTF-8') : '';
+    $locStr = !empty($post['location']) ? ' · ' . mb_strtoupper(trim($post['location']), 'UTF-8') : '';
     $stampText = $dateStr . $locStr;
     if (mb_strlen($stampText, 'UTF-8') > 32) {
         $stampText = mb_substr($stampText, 0, 31, 'UTF-8') . '…';
@@ -214,14 +274,14 @@ function render_polaroid_style($canvas, $srcImg, array $post, array $fonts): voi
     $stampColor = imagecolorallocate($canvas, 181, 52, 36); // #b53424
     $fontStamp = is_file($fonts['courier']) ? $fonts['courier'] : $fontTitle;
 
-    if ($fontStamp) {
-        $bbox = @imagettfbbox(10, 0, $fontStamp, $stampText);
+    if ($fontStamp && function_exists('imagettfbbox')) {
+        $bbox = @imagettfbbox(10, 0, $fontStamp, to_gd_text($stampText));
         $stampW = $bbox ? abs($bbox[2] - $bbox[0]) : 180;
         $stampX = ($cardX + $cardW - $photoMargin) - $stampW - 8;
         $stampY = $chinY + 84;
-        @imagettftext($canvas, 10, 0, max($photoX + 4, $stampX), $stampY, $stampColor, $fontStamp, $stampText);
+        gd_draw_single_line($canvas, $fontStamp, 10, max($photoX + 4, $stampX), $stampY, $stampColor, $stampText);
     } else {
-        imagestring($canvas, 3, $photoX + 4, $chinY + 68, $stampText, $stampColor);
+        gd_draw_single_line($canvas, null, 10, $photoX + 4, $chinY + 84, $stampColor, $stampText);
     }
 }
 
@@ -257,18 +317,13 @@ function render_darkroom_style($canvas, $srcImg, array $post, array $fonts): voi
     $amber = imagecolorallocate($canvas, 206, 126, 44);
     $fontMono = is_file($fonts['courier']) ? $fonts['courier'] : null;
 
-    $cam = !empty($post['exif_camera']) ? mb_strtoupper($post['exif_camera'], 'UTF-8') : '35MM ANALOG';
+    $cam = !empty($post['exif_camera']) ? mb_strtoupper(trim($post['exif_camera']), 'UTF-8') : '35MM ANALOG';
     $topFilmLabel = '▶ 24A     ' . $cam . '     SAFETY FILM';
     $dateStamp = date('d.m.Y', strtotime($post['published_at']));
     $bottomFilmLabel = '24     SYS.LOG // FOTO     ' . $dateStamp;
 
-    if ($fontMono) {
-        @imagettftext($canvas, 10, 0, 36, 52, $amber, $fontMono, $topFilmLabel);
-        @imagettftext($canvas, 10, 0, 36, $h - 48, $amber, $fontMono, $bottomFilmLabel);
-    } else {
-        imagestring($canvas, 2, 36, 45, $topFilmLabel, $amber);
-        imagestring($canvas, 2, 36, $h - 56, $bottomFilmLabel, $amber);
-    }
+    gd_draw_single_line($canvas, $fontMono, 10, 36, 52, $amber, $topFilmLabel);
+    gd_draw_single_line($canvas, $fontMono, 10, 36, $h - 48, $amber, $bottomFilmLabel);
 
     // 4. Centralt filmbillede
     $frameX = 80;
@@ -295,21 +350,13 @@ function render_darkroom_style($canvas, $srcImg, array $post, array $fonts): voi
     // Titel i filmrammen
     $white = imagecolorallocate($canvas, 245, 242, 236);
     $title = trim($post['title'] ?? '');
-    if ($fontMono) {
-        @imagettftext($canvas, 16, 0, $frameX + 24, $panelY + 36, $white, $fonts['courier_bold'] ?? $fontMono, $title);
-    } else {
-        imagestring($canvas, 4, $frameX + 24, $panelY + 20, $title, $white);
-    }
+    gd_draw_single_line($canvas, $fonts['courier_bold'] ?? $fontMono, 16, $frameX + 24, $panelY + 36, $white, $title);
 
     // EXIF data under titlen hvis til stede
     $exif = format_exif($post);
     if ($exif) {
         $faintText = imagecolorallocate($canvas, 175, 168, 158);
-        if ($fontMono) {
-            @imagettftext($canvas, 10, 0, $frameX + 24, $panelY + 56, $faintText, $fontMono, $exif);
-        } else {
-            imagestring($canvas, 2, $frameX + 24, $panelY + 44, $exif, $faintText);
-        }
+        gd_draw_single_line($canvas, $fontMono, 10, $frameX + 24, $panelY + 56, $faintText, $exif);
     }
 }
 
@@ -349,16 +396,14 @@ function render_notebook_style($canvas, $srcImg, array $post, array $fonts): voi
 
     // Top: Analog dato og lokation i terrakotta rød (#b53424)
     $redInk = imagecolorallocate($canvas, 181, 52, 36);
-    $headerText = format_analog_header($post['published_at'], $post['location'] ?? null);
+    $dateStr = format_stamp_date($post['published_at']);
+    $locStr = !empty($post['location']) ? ' · ' . mb_strtoupper(trim($post['location']), 'UTF-8') : '';
+    $headerText = 'LOG // ' . $dateStr . $locStr;
 
     $fontCourier = is_file($fonts['courier']) ? $fonts['courier'] : null;
     $fontSerifBold = is_file($fonts['serif_bold']) ? $fonts['serif_bold'] : null;
 
-    if ($fontCourier) {
-        @imagettftext($canvas, 11, 0, $contentX, 85, $redInk, $fontCourier, mb_strtoupper($headerText, 'UTF-8'));
-    } else {
-        imagestring($canvas, 3, $contentX, 72, $headerText, $redInk);
-    }
+    gd_draw_single_line($canvas, $fontCourier, 11, $contentX, 85, $redInk, $headerText);
 
     // Fin skillelinje
     $ruleColor = imagecolorallocate($canvas, 222, 213, 194);
@@ -368,35 +413,25 @@ function render_notebook_style($canvas, $srcImg, array $post, array $fonts): voi
     $titleInk = imagecolorallocate($canvas, 24, 21, 19);
     $title = trim($post['title'] ?? '');
 
-    if ($fontSerifBold) {
-        draw_wrapped_text($canvas, $fontSerifBold, 26, $contentX, 165, $titleInk, $title, $maxW, 38, 3);
-    } else {
-        imagestring($canvas, 5, $contentX, 130, mb_substr($title, 0, 32), $titleInk);
-    }
+    draw_wrapped_text($canvas, $fontSerifBold, 26, $contentX, 165, $titleInk, $title, $maxW, 38, 3);
 
     // Uddrag af logbogsnoterne (hvis udfyldt) – roligt og autentisk
     $rawContent = trim($post['content'] ?? '');
     if (!empty($rawContent)) {
         // Fjern eventuel markdown formatering
-        $cleanNote = preg_replace('/[*_=#]/', '', $rawContent);
-        $cleanNote = preg_replace('/\s+/', ' ', $cleanNote);
+        $cleanNote = preg_replace('/[*_=#]/u', '', $rawContent);
+        $cleanNote = preg_replace('/\s+/u', ' ', $cleanNote);
         $cleanNote = trim($cleanNote);
 
         $noteInk = imagecolorallocate($canvas, 80, 72, 64);
-        if ($fontCourier) {
-            draw_wrapped_text($canvas, $fontCourier, 12, $contentX, 330, $noteInk, $cleanNote, $maxW, 22, 5);
-        }
+        draw_wrapped_text($canvas, $fontCourier, 12, $contentX, 330, $noteInk, $cleanNote, $maxW, 22, 5);
     }
 
     // Bund: EXIF kameradata hvis tilgængelig
     $exif = format_exif($post);
     if ($exif) {
         $faintSepia = imagecolorallocate($canvas, 145, 133, 121);
-        if ($fontCourier) {
-            @imagettftext($canvas, 10, 0, $contentX, $h - 55, $faintSepia, $fontCourier, '⌀ ' . $exif);
-        } else {
-            imagestring($canvas, 2, $contentX, $h - 65, 'EXIF: ' . $exif, $faintSepia);
-        }
+        gd_draw_single_line($canvas, $fontCourier, 10, $contentX, $h - 55, $faintSepia, '⌀ ' . $exif);
     }
 }
 
@@ -542,17 +577,30 @@ function format_stamp_date(string $dateStr): string {
 }
 
 /**
- * Tegner ombrudt tekst over flere linjer via imagettftext
+ * Tegner ombrudt tekst over flere linjer via imagettftext med fuld support for nordiske tegn
  */
-function draw_wrapped_text($image, string $fontFile, int $fontSize, int $x, int $y, int $color, string $text, int $maxWidth, int $lineHeight, int $maxLines = 4): void {
-    $words = preg_split('/\s+/', $text);
+function draw_wrapped_text($image, ?string $fontFile, int $fontSize, int $x, int $y, int $color, string $text, int $maxWidth, int $lineHeight, int $maxLines = 4): void {
+    $cleanText = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $words = preg_split('/\s+/u', $cleanText, -1, PREG_SPLIT_NO_EMPTY);
+    if (empty($words)) {
+        return;
+    }
+
     $lines = [];
     $currentLine = '';
 
+    $useTtf = $fontFile && is_file($fontFile) && function_exists('imagettftext') && function_exists('imagettfbbox');
+
     foreach ($words as $word) {
         $testLine = $currentLine === '' ? $word : $currentLine . ' ' . $word;
-        $bbox = @imagettfbbox($fontSize, 0, $fontFile, $testLine);
-        $lineWidth = $bbox ? abs($bbox[2] - $bbox[0]) : 0;
+        $lineWidth = 0;
+
+        if ($useTtf) {
+            $bbox = @imagettfbbox($fontSize, 0, $fontFile, to_gd_text($testLine));
+            $lineWidth = $bbox ? abs($bbox[2] - $bbox[0]) : 0;
+        } else {
+            $lineWidth = strlen(to_latin_text($testLine)) * imagefontwidth(4);
+        }
 
         if ($lineWidth > $maxWidth && $currentLine !== '') {
             $lines[] = $currentLine;
@@ -573,7 +621,7 @@ function draw_wrapped_text($image, string $fontFile, int $fontSize, int $x, int 
         if ($idx === $maxLines - 1 && count($words) > count(explode(' ', implode(' ', $lines)))) {
             $line .= '…';
         }
-        @imagettftext($image, $fontSize, 0, $x, $currentY, $color, $fontFile, $line);
+        gd_draw_single_line($image, $fontFile, $fontSize, $x, $currentY, $color, $line);
         $currentY += $lineHeight;
     }
 }

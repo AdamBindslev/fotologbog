@@ -1368,14 +1368,14 @@ function renderOgLivePreview() {
             // Titel på hagen
             ctx.textAlign = 'left';
             ctx.fillStyle = '#1a1715';
-            ctx.font = 'bold 24px Courier, monospace';
+            ctx.font = 'bold 24px "Courier Prime", Courier, monospace';
             const displayTitle = title.length > 34 ? title.substring(0, 33) + '…' : title;
             ctx.fillText(displayTitle, px + 4, py + ph + 54);
 
             // Stempel i terracotta-rød (#b53424)
             ctx.textAlign = 'right';
             ctx.fillStyle = '#b53424';
-            ctx.font = 'bold 16px Courier, monospace';
+            ctx.font = 'bold 16px "Courier Prime", Courier, monospace';
             const stamp = dateStr + (location ? ' · ' + location.toUpperCase() : '');
             ctx.fillText(stamp.length > 32 ? stamp.substring(0, 31) + '…' : stamp, px + pw, py + ph + 88);
 
@@ -1397,7 +1397,7 @@ function renderOgLivePreview() {
 
             // Filmkant markeringer
             ctx.fillStyle = '#d68331';
-            ctx.font = '14px Courier, monospace';
+            ctx.font = '14px "Courier Prime", Courier, monospace';
             ctx.textAlign = 'left';
             const camLabel = exifCam ? exifCam.toUpperCase() : '35MM ANALOG';
             ctx.fillText(`▶ 24A     ${camLabel}     SAFETY FILM`, 36, 52);
@@ -1427,12 +1427,12 @@ function renderOgLivePreview() {
 
             ctx.textAlign = 'left';
             ctx.fillStyle = '#f5f2eb';
-            ctx.font = 'bold 22px Courier, monospace';
+            ctx.font = 'bold 22px "Courier Prime", Courier, monospace';
             ctx.fillText(title, fx + 24, fy + fh - 38);
 
             if (location || exifCam) {
                 ctx.fillStyle = '#b0a79a';
-                ctx.font = '14px Courier, monospace';
+                ctx.font = '14px "Courier Prime", Courier, monospace';
                 ctx.fillText([location, exifCam].filter(Boolean).join(' · '), fx + 24, fy + fh - 16);
             }
 
@@ -1470,7 +1470,7 @@ function renderOgLivePreview() {
             const cx = splitX + 54;
             ctx.textAlign = 'left';
             ctx.fillStyle = '#b53424';
-            ctx.font = 'bold 15px Courier, monospace';
+            ctx.font = 'bold 15px "Courier Prime", Courier, monospace';
             const hdr = 'LOG // ' + dateStr + (location ? ' · ' + location.toUpperCase() : '');
             ctx.fillText(hdr, cx, 85);
 
@@ -1481,19 +1481,19 @@ function renderOgLivePreview() {
             ctx.stroke();
 
             ctx.fillStyle = '#181513';
-            ctx.font = 'bold 36px Georgia, serif';
+            ctx.font = 'bold 36px "Fraunces", Georgia, serif';
             wrapTextCanvas(ctx, title, cx, 160, w - cx - 48, 44, 3);
 
             if (content) {
                 const cleanContent = content.replace(/[*_=#]/g, '').replace(/\s+/g, ' ').trim();
                 ctx.fillStyle = '#544b43';
-                ctx.font = '15px Courier, monospace';
+                ctx.font = '15px "Courier Prime", Courier, monospace';
                 wrapTextCanvas(ctx, cleanContent, cx, 310, w - cx - 48, 26, 4);
             }
 
             if (exifCam) {
                 ctx.fillStyle = '#918579';
-                ctx.font = '13px Courier, monospace';
+                ctx.font = '13px "Courier Prime", Courier, monospace';
                 ctx.fillText('⌀ ' + exifCam, cx, h - 55);
             }
 
