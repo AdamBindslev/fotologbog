@@ -57,6 +57,14 @@ $results['Mappen "uploads/"'] = [
     'desc' => 'Relativ sti: /uploads'
 ];
 
+// 5b. GD Billedbehandling (til Open Graph delingskort)
+$hasGd = extension_loaded('gd') && function_exists('imagecreatetruecolor');
+$results['GD Billedbehandling'] = [
+    'ok' => $hasGd,
+    'val' => $hasGd ? 'Aktiveret (understøtter dynamiske delingskort)' : 'Mangler (delinger bruger rå fotos som fallback)',
+    'desc' => 'Påkrævet til automatisk generering af sociale kort (1200x630)'
+];
+
 // 6. Base URL og Uploads URL
 $results['Konfiguration URL'] = [
     'ok' => true,

@@ -64,6 +64,7 @@ function init_db_schema(PDO $db): void {
             latitude REAL,
             longitude REAL,
             published_at DATETIME NOT NULL,
+            og_style TEXT DEFAULT 'polaroid',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -97,6 +98,9 @@ function init_db_schema(PDO $db): void {
     }
     if (!in_array('exif_camera', $existingCols)) {
         $db->exec("ALTER TABLE posts ADD COLUMN exif_camera TEXT");
+    }
+    if (!in_array('og_style', $existingCols)) {
+        $db->exec("ALTER TABLE posts ADD COLUMN og_style TEXT DEFAULT 'polaroid'");
     }
 
     // Tags & Post-Tags tabeller til emner

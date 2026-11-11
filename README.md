@@ -21,6 +21,7 @@ Bygget til ubesværet, daglig publicering direkte fra din mobiltelefon via en de
   * **Mørkekammer-lup:** Fuldskærmsvisning i mørkt rum med EXIF-stempel og lynhurtig piletast-navigation.
   * **Månedlige kontaktark (Contact Sheets):** Visuel kalender med miniaturebilleder for hver dag i måneden.
   * **Emnesky & Tags:** Dynamisk organisk emnesky for både tags og lokationer.
+  * **🖼️ Autentiske Delingskort (Open Graph 1200×630):** Vælg mellem 4 rene, analoge stilarter (*Polaroid*, *35mm Mørkekammer*, *Notesbogsark* eller *Rent foto*) med live forhåndsvisning direkte i mobilen og automatisk GD-generering til sociale medier (Facebook, iMessage, X, LinkedIn). Helt fri for CTA-støj eller læsetids-tricks.
 
 * **Nul database-opsætning:**
   * Kører på en lokal **SQLite**-database (`data/logbog.db`), der oprettes og migreres automatisk. Ingen behov for MySQL eller serveropsætning.

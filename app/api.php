@@ -159,6 +159,13 @@ if ($action === 'create_post') {
     $slug = slugify($title);
     $db = get_db();
 
+    // Stil til Open Graph delingskort (polaroid, darkroom, notebook, raw)
+    $validStyles = ['polaroid', 'darkroom', 'notebook', 'raw'];
+    $ogStyle = trim((string)($input['og_style'] ?? 'polaroid'));
+    if (!in_array($ogStyle, $validStyles, true)) {
+        $ogStyle = 'polaroid';
+    }
+
     // Generer et unikt, ikke-fortløbende UID til permalinks
     $uid = generate_post_uid();
     $stmtCheck = $db->prepare("SELECT COUNT(*) FROM posts WHERE uid = :uid");
@@ -171,11 +178,11 @@ if ($action === 'create_post') {
     $stmt = $db->prepare("
         INSERT INTO posts (
             uid, title, slug, content, image_path, location, latitude, longitude, published_at,
-            exif_camera, exif_focal, exif_aperture, exif_shutter, exif_iso, created_at, updated_at
+            og_style, exif_camera, exif_focal, exif_aperture, exif_shutter, exif_iso, created_at, updated_at
         )
         VALUES (
             :uid, :title, :slug, :content, :image_path, :location, :latitude, :longitude, :published_at,
-            :exif_camera, :exif_focal, :exif_aperture, :exif_shutter, :exif_iso, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            :og_style, :exif_camera, :exif_focal, :exif_aperture, :exif_shutter, :exif_iso, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
     ");
 
@@ -189,6 +196,7 @@ if ($action === 'create_post') {
         ':latitude' => $latitude,
         ':longitude' => $longitude,
         ':published_at' => $publishedAt,
+        ':og_style' => $ogStyle,
         ':exif_camera' => $exifCamera ?: null,
         ':exif_focal' => $exifFocal ?: null,
         ':exif_aperture' => $exifAperture ?: null,
@@ -313,6 +321,12 @@ if ($action === 'update_post') {
         }
     }
 
+    $validStyles = ['polaroid', 'darkroom', 'notebook', 'raw'];
+    $ogStyle = isset($input['og_style']) ? trim((string)$input['og_style']) : ($post['og_style'] ?? 'polaroid');
+    if (!in_array($ogStyle, $validStyles, true)) {
+        $ogStyle = $post['og_style'] ?? 'polaroid';
+    }
+
     $db = get_db();
     $stmt = $db->prepare("
         UPDATE posts 
@@ -323,6 +337,7 @@ if ($action === 'update_post') {
             longitude = :longitude, 
             published_at = :published_at, 
             image_path = :image_path,
+            og_style = :og_style,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = :id
     ");
@@ -335,8 +350,12 @@ if ($action === 'update_post') {
         ':longitude' => $longitude,
         ':published_at' => $publishedAt,
         ':image_path' => $imagePath,
+        ':og_style' => $ogStyle,
         ':id' => $id
     ]);
+
+    // Ryd eventuelt cached Open Graph billede, så det opdateres med de nye data
+    delete_og_image_cache($post['uid'] ?? (string)$id);
 
     // Opdater tags hvis sendt med
     if (isset($input['tags'])) {
@@ -392,6 +411,7 @@ if ($action === 'delete_post') {
 
     // Slet billedfilen sikkert
     delete_uploaded_image($post['image_path'] ?? null);
+    delete_og_image_cache($post['uid'] ?? (string)$id);
 
     $db = get_db();
     $stmtPt = $db->prepare("DELETE FROM post_tags WHERE post_id = :id");

@@ -132,7 +132,7 @@ function render_contact_sheet_grid(array $sheet, array $monthNames, bool $linkTo
 }
 ?>
 <?php
-$socialImg = !empty($posts[0]['image_path']) ? get_social_image_meta($posts[0]['image_path']) : null;
+$socialImg = !empty($posts[0]['image_path']) ? (get_post_og_meta($posts[0]) ?? get_social_image_meta($posts[0]['image_path'])) : null;
 $ogTitle = !empty($activeFilterTitle) ? ($activeFilterTitle . ' – ' . SITE_TITLE) : SITE_TITLE;
 ?>
 <!DOCTYPE html>

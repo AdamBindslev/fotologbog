@@ -536,6 +536,77 @@ require_once __DIR__ . '/../includes/auth.php';
             padding: 24px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
         }
+
+        /* Delingskort / Open Graph Vælger */
+        .og-style-selector {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .og-style-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 4px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+            color: var(--text-main);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .og-style-btn:hover {
+            border-color: var(--text-muted);
+        }
+        .og-style-btn.active {
+            background: #242220;
+            color: #faf8f5;
+            border-color: #242220;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        }
+        @media (prefers-color-scheme: dark) {
+            .og-style-btn.active {
+                background: #f5f2eb;
+                color: #1a1816;
+                border-color: #f5f2eb;
+            }
+        }
+        .og-style-icon {
+            font-size: 18px;
+            margin-bottom: 4px;
+            line-height: 1;
+        }
+        .og-style-label {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .og-preview-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .og-canvas-wrap {
+            width: 100%;
+            aspect-ratio: 1200 / 630;
+            background: #181614;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .og-canvas-wrap canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: contain;
+        }
     </style>
 </head>
 <body>
@@ -708,6 +779,50 @@ require_once __DIR__ . '/../includes/auth.php';
                     </div>
                     <div id="recentTagsContainer" class="recent-tags-chips">
                         <span style="font-size: 11px; color: var(--text-muted);">Henter tags...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delingskort / Social Share Style -->
+            <div class="form-group" style="margin-top: 18px; margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                    <label class="form-label" style="margin-bottom: 0;">Delingskort (Sociale medier)</label>
+                    <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
+                        Vælg visuelt udtryk
+                    </span>
+                </div>
+                
+                <div class="og-style-selector" id="ogStyleSelector">
+                    <button type="button" class="og-style-btn active" data-style="polaroid" onclick="setOgStyle('polaroid')">
+                        <span class="og-style-icon">📷</span>
+                        <span class="og-style-label">Polaroid</span>
+                    </button>
+                    <button type="button" class="og-style-btn" data-style="darkroom" onclick="setOgStyle('darkroom')">
+                        <span class="og-style-icon">🎞️</span>
+                        <span class="og-style-label">35mm Film</span>
+                    </button>
+                    <button type="button" class="og-style-btn" data-style="notebook" onclick="setOgStyle('notebook')">
+                        <span class="og-style-icon">📓</span>
+                        <span class="og-style-label">Notesbog</span>
+                    </button>
+                    <button type="button" class="og-style-btn" data-style="raw" onclick="setOgStyle('raw')">
+                        <span class="og-style-icon">🖼️</span>
+                        <span class="og-style-label">Rent foto</span>
+                    </button>
+                </div>
+
+                <!-- Live Preview af det sociale delingskort -->
+                <div class="og-preview-card" id="ogPreviewContainer" style="margin-top: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">
+                            [ FORHÅNDSVISNING AF DELT KORT · 1200 × 630 ]
+                        </span>
+                        <span id="ogPreviewStatus" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">
+                            Opdateres automatisk
+                        </span>
+                    </div>
+                    <div class="og-canvas-wrap">
+                        <canvas id="ogPreviewCanvas" width="1200" height="630"></canvas>
                     </div>
                 </div>
             </div>
@@ -886,6 +1001,27 @@ require_once __DIR__ . '/../includes/auth.php';
                     <input type="text" id="editExifIso" class="form-control" placeholder="f.eks. ISO 400" title="ISO">
                 </div>
             </div>
+            <div class="form-group" style="margin-top: 14px;">
+                <label class="form-label">Delingskort (Sociale medier)</label>
+                <div class="og-style-selector" id="editOgStyleSelector">
+                    <button type="button" class="og-style-btn" data-style="polaroid" onclick="setEditOgStyle('polaroid')">
+                        <span class="og-style-icon">📷</span>
+                        <span class="og-style-label">Polaroid</span>
+                    </button>
+                    <button type="button" class="og-style-btn" data-style="darkroom" onclick="setEditOgStyle('darkroom')">
+                        <span class="og-style-icon">🎞️</span>
+                        <span class="og-style-label">35mm Film</span>
+                    </button>
+                    <button type="button" class="og-style-btn" data-style="notebook" onclick="setEditOgStyle('notebook')">
+                        <span class="og-style-icon">📓</span>
+                        <span class="og-style-label">Notesbog</span>
+                    </button>
+                    <button type="button" class="og-style-btn" data-style="raw" onclick="setEditOgStyle('raw')">
+                        <span class="og-style-icon">🖼️</span>
+                        <span class="og-style-label">Rent foto</span>
+                    </button>
+                </div>
+            </div>
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button type="submit" class="btn-primary" id="saveEditBtn" style="padding: 12px;">Gem ændringer</button>
                 <button type="button" class="btn-small" onclick="closeEditModal()" style="padding: 12px 18px;">Annuller</button>
@@ -954,6 +1090,7 @@ function switchView(viewName) {
         document.querySelectorAll('.tab-btn')[0].classList.add('active');
         renderSelectedTags();
         loadRecentTags();
+        setTimeout(renderOgLivePreview, 60);
     } else if (viewName === 'history') {
         document.getElementById('viewHistory').classList.add('active');
         document.getElementById('bottomNav').style.display = 'flex';
@@ -1082,6 +1219,27 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
+// Tilstand for delingskort (Social Share / Open Graph)
+let currentOgStyle = 'polaroid';
+let editOgStyle = 'polaroid';
+let cachedPreviewImg = null;
+
+function setOgStyle(style) {
+    currentOgStyle = style;
+    document.querySelectorAll('#ogStyleSelector .og-style-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.style === style);
+    });
+    saveDraft();
+    renderOgLivePreview();
+}
+
+function setEditOgStyle(style) {
+    editOgStyle = style;
+    document.querySelectorAll('#editOgStyleSelector .og-style-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.style === style);
+    });
+}
+
 // Auto-gem kladde i localStorage så refleksioner ikke går tabt
 function saveDraft() {
     const draft = {
@@ -1090,6 +1248,7 @@ function saveDraft() {
         location: document.getElementById('locInput')?.value || '',
         camera: document.getElementById('exifCameraInput')?.value || '',
         focal: document.getElementById('exifFocalInput')?.value || '',
+        og_style: currentOgStyle,
         tags: selectedTags
     };
     const hasContent = draft.title.trim() || draft.content.trim() || draft.location.trim() || draft.tags.length > 0;
@@ -1118,6 +1277,9 @@ function restoreDraft() {
         if (draft.focal && !document.getElementById('exifFocalInput').value) {
             document.getElementById('exifFocalInput').value = draft.focal;
         }
+        if (draft.og_style) {
+            setOgStyle(draft.og_style);
+        }
         if (Array.isArray(draft.tags) && draft.tags.length > 0) {
             selectedTags = draft.tags.slice(0, 3);
         }
@@ -1135,14 +1297,294 @@ function clearDraft(resetFields = false) {
         document.getElementById('contentInput').value = '';
         document.getElementById('locInput').value = '';
         selectedTags = [];
+        setOgStyle('polaroid');
         renderSelectedTags();
         showAlert('Kladde ryddet', 'success', 2000);
     }
 }
 
-['titleInput', 'contentInput', 'locInput', 'exifCameraInput', 'exifFocalInput'].forEach(id => {
+// Live forhåndsvisning af Open Graph delingskort (1200 x 630 Canvas)
+function renderOgLivePreview() {
+    const canvas = document.getElementById('ogPreviewCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = 1200;
+    const h = 630;
+
+    const title = (document.getElementById('titleInput')?.value || '').trim() || 'Log ' + (document.getElementById('dateInput')?.value ? new Date(document.getElementById('dateInput').value).toLocaleDateString('da-DK') : 'i dag');
+    const location = (document.getElementById('locInput')?.value || '').trim();
+    const dateVal = document.getElementById('dateInput')?.value ? new Date(document.getElementById('dateInput').value) : new Date();
+    const dateStr = dateVal.toLocaleDateString('da-DK', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase().replace('.', '');
+    const content = (document.getElementById('contentInput')?.value || '').trim();
+    const exifCam = (document.getElementById('exifCameraInput')?.value || '').trim();
+
+    function drawPreviewWithImage(img) {
+        ctx.clearRect(0, 0, w, h);
+
+        if (currentOgStyle === 'polaroid') {
+            // Mørk skrivebordsflade (#231c17)
+            ctx.fillStyle = '#231c17';
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeStyle = '#16110d';
+            ctx.lineWidth = 16;
+            ctx.strokeRect(8, 8, w - 16, h - 16);
+
+            // Polaroid kort (590 x 554)
+            const cardW = 590, cardH = 554;
+            const cardX = (w - cardW) / 2;
+            const cardY = (h - cardH) / 2;
+
+            // Skygge
+            ctx.fillStyle = 'rgba(10, 8, 6, 0.45)';
+            ctx.fillRect(cardX + 4, cardY + 6, cardW, cardH);
+
+            // Papir
+            ctx.fillStyle = '#f8f5ee';
+            ctx.fillRect(cardX, cardY, cardW, cardH);
+            ctx.strokeStyle = '#dcd5c4';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(cardX, cardY, cardW, cardH);
+
+            // Billedareal
+            const pm = 28;
+            const pw = cardW - (pm * 2);
+            const ph = 416;
+            const px = cardX + pm;
+            const py = cardY + pm;
+
+            if (img) {
+                drawImageCover(ctx, img, px, py, pw, ph);
+            } else {
+                ctx.fillStyle = '#1c1916';
+                ctx.fillRect(px, py, pw, ph);
+                ctx.fillStyle = '#8f867a';
+                ctx.font = '16px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('[ VÆLG ET FOTOGRAFI OVENFOR ]', px + pw / 2, py + ph / 2);
+            }
+            ctx.strokeStyle = '#cfc6b2';
+            ctx.strokeRect(px, py, pw, ph);
+
+            // Titel på hagen
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#1a1715';
+            ctx.font = 'bold 24px Courier, monospace';
+            const displayTitle = title.length > 34 ? title.substring(0, 33) + '…' : title;
+            ctx.fillText(displayTitle, px + 4, py + ph + 54);
+
+            // Stempel i terracotta-rød (#b53424)
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#b53424';
+            ctx.font = 'bold 16px Courier, monospace';
+            const stamp = dateStr + (location ? ' · ' + location.toUpperCase() : '');
+            ctx.fillText(stamp.length > 32 ? stamp.substring(0, 31) + '…' : stamp, px + pw, py + ph + 88);
+
+        } else if (currentOgStyle === 'darkroom') {
+            // Sort mørkekammer
+            ctx.fillStyle = '#0e0e0e';
+            ctx.fillRect(0, 0, w, h);
+
+            // 35mm perforeringer
+            const spW = 16, spH = 26, spacing = 46;
+            for (let x = 18; x < w - 20; x += spacing) {
+                ctx.fillStyle = '#070707';
+                ctx.fillRect(x, 14, spW, spH);
+                ctx.fillRect(x, h - 14 - spH, spW, spH);
+                ctx.strokeStyle = '#222222';
+                ctx.strokeRect(x, 14, spW, spH);
+                ctx.strokeRect(x, h - 14 - spH, spW, spH);
+            }
+
+            // Filmkant markeringer
+            ctx.fillStyle = '#d68331';
+            ctx.font = '14px Courier, monospace';
+            ctx.textAlign = 'left';
+            const camLabel = exifCam ? exifCam.toUpperCase() : '35MM ANALOG';
+            ctx.fillText(`▶ 24A     ${camLabel}     SAFETY FILM`, 36, 52);
+            ctx.fillText(`24     SYS.LOG // FOTO     ${dateStr}`, 36, h - 48);
+
+            // Central ramme
+            const fx = 80, fy = 66, fw = 1040, fh = 496;
+            if (img) {
+                drawImageCover(ctx, img, fx, fy, fw, fh);
+            } else {
+                ctx.fillStyle = '#151515';
+                ctx.fillRect(fx, fy, fw, fh);
+                ctx.fillStyle = '#8f867a';
+                ctx.font = '16px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('[ VÆLG ET FOTOGRAFI OVENFOR ]', fx + fw / 2, fy + fh / 2);
+            }
+            ctx.strokeStyle = '#282828';
+            ctx.strokeRect(fx, fy, fw, fh);
+
+            // Dæmpet bjælke
+            const grad = ctx.createLinearGradient(0, fy + fh - 80, 0, fy + fh);
+            grad.addColorStop(0, 'rgba(10, 10, 10, 0)');
+            grad.addColorStop(1, 'rgba(10, 10, 10, 0.85)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(fx, fy + fh - 80, fw, 80);
+
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#f5f2eb';
+            ctx.font = 'bold 22px Courier, monospace';
+            ctx.fillText(title, fx + 24, fy + fh - 38);
+
+            if (location || exifCam) {
+                ctx.fillStyle = '#b0a79a';
+                ctx.font = '14px Courier, monospace';
+                ctx.fillText([location, exifCam].filter(Boolean).join(' · '), fx + 24, fy + fh - 16);
+            }
+
+        } else if (currentOgStyle === 'notebook') {
+            // Split: Venstre foto (620), Højre manila (580)
+            const splitX = 620;
+            if (img) {
+                drawImageCover(ctx, img, 0, 0, splitX, h);
+            } else {
+                ctx.fillStyle = '#211d1a';
+                ctx.fillRect(0, 0, splitX, h);
+                ctx.fillStyle = '#8f867a';
+                ctx.font = '16px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('[ VÆLG ET FOTOGRAFI ]', splitX / 2, h / 2);
+            }
+
+            // Manila papir
+            ctx.fillStyle = '#fbf7ee';
+            ctx.fillRect(splitX, 0, w - splitX, h);
+            ctx.strokeStyle = '#dad1c0';
+            ctx.strokeRect(splitX, 0, w - splitX, h);
+
+            // Spiralhuller
+            for (let y = 28; y < h - 10; y += 42) {
+                ctx.beginPath();
+                ctx.arc(splitX + 16, y, 7, 0, Math.PI * 2);
+                ctx.fillStyle = '#261e18';
+                ctx.fill();
+                ctx.strokeStyle = '#b9afa0';
+                ctx.stroke();
+            }
+
+            // Tekst på arket
+            const cx = splitX + 54;
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#b53424';
+            ctx.font = 'bold 15px Courier, monospace';
+            const hdr = 'LOG // ' + dateStr + (location ? ' · ' + location.toUpperCase() : '');
+            ctx.fillText(hdr, cx, 85);
+
+            ctx.strokeStyle = '#ded5c2';
+            ctx.beginPath();
+            ctx.moveTo(cx, 105);
+            ctx.lineTo(w - 48, 105);
+            ctx.stroke();
+
+            ctx.fillStyle = '#181513';
+            ctx.font = 'bold 36px Georgia, serif';
+            wrapTextCanvas(ctx, title, cx, 160, w - cx - 48, 44, 3);
+
+            if (content) {
+                const cleanContent = content.replace(/[*_=#]/g, '').replace(/\s+/g, ' ').trim();
+                ctx.fillStyle = '#544b43';
+                ctx.font = '15px Courier, monospace';
+                wrapTextCanvas(ctx, cleanContent, cx, 310, w - cx - 48, 26, 4);
+            }
+
+            if (exifCam) {
+                ctx.fillStyle = '#918579';
+                ctx.font = '13px Courier, monospace';
+                ctx.fillText('⌀ ' + exifCam, cx, h - 55);
+            }
+
+        } else if (currentOgStyle === 'raw') {
+            // Rent fotografi i 1200 x 630
+            ctx.fillStyle = '#12100e';
+            ctx.fillRect(0, 0, w, h);
+            if (img) {
+                const aspect = img.width / img.height;
+                if (aspect >= 1.45) {
+                    drawImageCover(ctx, img, 0, 0, w, h);
+                } else {
+                    const fitW = h * aspect;
+                    const ox = (w - fitW) / 2;
+                    ctx.drawImage(img, ox, 0, fitW, h);
+                }
+            } else {
+                ctx.fillStyle = '#8f867a';
+                ctx.font = '16px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('[ VÆLG ET FOTOGRAFI OVENFOR ]', w / 2, h / 2);
+            }
+        }
+    }
+
+    if (compressedImageData) {
+        if (!cachedPreviewImg || cachedPreviewImg.src !== compressedImageData) {
+            cachedPreviewImg = new Image();
+            cachedPreviewImg.onload = () => drawPreviewWithImage(cachedPreviewImg);
+            cachedPreviewImg.src = compressedImageData;
+        } else {
+            drawPreviewWithImage(cachedPreviewImg);
+        }
+    } else {
+        drawPreviewWithImage(null);
+    }
+}
+
+function drawImageCover(ctx, img, x, y, w, h) {
+    const imgAspect = img.width / img.height;
+    const boxAspect = w / h;
+    let sx, sy, sw, sh;
+    if (imgAspect > boxAspect) {
+        sw = img.height * boxAspect;
+        sh = img.height;
+        sx = (img.width - sw) / 2;
+        sy = 0;
+    } else {
+        sw = img.width;
+        sh = img.width / boxAspect;
+        sx = 0;
+        sy = (img.height - sh) / 2;
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+function wrapTextCanvas(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+    const words = text.split(/\s+/);
+    let line = '';
+    let lineCount = 0;
+    let currY = y;
+
+    for (let n = 0; n < words.length; n++) {
+        const testLine = line + (line ? ' ' : '') + words[n];
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && line !== '') {
+            lineCount++;
+            if (lineCount >= maxLines) {
+                ctx.fillText(line + '…', x, currY);
+                return;
+            }
+            ctx.fillText(line, x, currY);
+            line = words[n];
+            currY += lineHeight;
+        } else {
+            line = testLine;
+        }
+    }
+    if (line && lineCount < maxLines) {
+        ctx.fillText(line, x, currY);
+    }
+}
+
+['titleInput', 'contentInput', 'locInput', 'dateInput', 'exifCameraInput', 'exifFocalInput'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('input', saveDraft);
+    if (el) {
+        el.addEventListener('input', () => {
+            saveDraft();
+            renderOgLivePreview();
+        });
+    }
 });
 
 // Skrivemaskine-formatering (Fed, Kursiv, Understreget & Rødt zebra-bånd)
@@ -1582,6 +2024,8 @@ async function handleImageSelected(e) {
     try {
         const res = await compressImageFileToDataUrl(file);
         compressedImageData = res.dataUrl;
+        cachedPreviewImg = null;
+        renderOgLivePreview();
 
         const preview = document.getElementById('imagePreview');
         preview.src = compressedImageData;
@@ -1862,6 +2306,7 @@ async function handleCreatePost(e) {
         longitude: document.getElementById('lonInput').value,
         published_at: document.getElementById('dateInput').value,
         image_data: compressedImageData,
+        og_style: currentOgStyle,
         tags: selectedTags,
         exif_camera: (document.getElementById('exifCameraInput')?.value || '').trim(),
         exif_focal: (document.getElementById('exifFocalInput')?.value || '').trim(),
@@ -1904,6 +2349,9 @@ async function handleCreatePost(e) {
             document.getElementById('imageResInfo').style.display = 'none';
             setDefaultDate();
             loadRecentTags();
+            setOgStyle('polaroid');
+            cachedPreviewImg = null;
+            renderOgLivePreview();
         }
     } catch (err) {
         showAlert(err.message || 'Fejl under gemning', 'error');
@@ -2093,6 +2541,8 @@ async function openEditModal(id) {
         document.getElementById('editExifShutter').value = p.exif_shutter || '';
         document.getElementById('editExifIso').value = p.exif_iso || '';
 
+        setEditOgStyle(p.og_style || 'polaroid');
+
         document.getElementById('editModal').classList.add('active');
     } catch (e) {
         showAlert('Kunne ikke hente indlæg: ' + e.message, 'error');
@@ -2117,6 +2567,7 @@ async function handleSaveEdit(e) {
         location: document.getElementById('editLocInput').value,
         content: document.getElementById('editContentInput').value,
         published_at: document.getElementById('editDateInput').value,
+        og_style: editOgStyle,
         tags: editSelectedTags,
         exif_camera: document.getElementById('editExifCamera').value,
         exif_focal: document.getElementById('editExifFocal').value,

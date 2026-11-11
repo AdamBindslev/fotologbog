@@ -533,6 +533,58 @@ function delete_uploaded_image(?string $imagePath): void {
 }
 
 /**
+ * Sletter eventuelle cached Open Graph-billeder for et givent indlæg (UID eller ID)
+ */
+function delete_og_image_cache(?string $identifier): void {
+    if (empty($identifier)) {
+        return;
+    }
+    $safeUid = preg_replace('/[^a-zA-Z0-9_-]/', '', $identifier);
+    if ($safeUid === '') {
+        return;
+    }
+    $cacheDir = UPLOADS_DIR . '/og';
+    if (!is_dir($cacheDir)) {
+        return;
+    }
+    $pattern = $cacheDir . '/' . $safeUid . '_*.jpg';
+    $files = glob($pattern);
+    if (is_array($files)) {
+        foreach ($files as $file) {
+            if (is_file($file)) {
+                @unlink($file);
+            }
+        }
+    }
+}
+
+/**
+ * Returnerer fulde sociale metadata (og:image) til et indlæg baseret på dets valgte stil.
+ */
+function get_post_og_meta(array $post): ?array {
+    if (empty($post['image_path'])) {
+        return null;
+    }
+    $uid = !empty($post['uid']) ? $post['uid'] : (string)$post['id'];
+    $style = $post['og_style'] ?? 'polaroid';
+    $validStyles = ['polaroid', 'darkroom', 'notebook', 'raw'];
+    if (!in_array($style, $validStyles, true)) {
+        $style = 'polaroid';
+    }
+
+    $version = !empty($post['updated_at']) ? strtotime($post['updated_at']) : strtotime($post['published_at'] ?? 'now');
+    $url = rtrim(BASE_URL, '/') . '/og-image.php?p=' . rawurlencode($uid) . '&v=' . (int)$version;
+
+    return [
+        'url' => $url,
+        'width' => 1200,
+        'height' => 630,
+        'mime' => 'image/jpeg',
+        'style' => $style
+    ];
+}
+
+/**
  * Returnerer en tape-monteringsvariant (1 til 5) deterministisk baseret på indlæggets ID/UID.
  */
 function get_tape_variant(string|int $uid): int {
