@@ -427,21 +427,16 @@ function get_unified_index_items(): array {
         }
         $item['weight'] = max(1, min(5, $weight));
 
-        // Deterministisk hash sikrer en stabil visning ved genindlæsning
-        $h = abs(crc32($item['type'] . ':' . $item['raw_name']));
-        $item['rot'] = $rotations[$h % count($rotations)];
-        $item['drift'] = $drifts[($h >> 3) % count($drifts)];
-        $item['font_style'] = $fontStyles[($h >> 6) % count($fontStyles)];
-        $item['color_tone'] = $colorTones[($h >> 9) % count($colorTones)];
-        // Spredningsorden så skyen er et organisk miks i stedet for en lige alfabetisk kolonne
-        $item['scatter_val'] = ($h * 1664525 + 1013904223) % 100000;
+        // Tilfældig organisk variation så skyen føles levende
+        $item['rot'] = $rotations[array_rand($rotations)];
+        $item['drift'] = $drifts[array_rand($drifts)];
+        $item['font_style'] = $fontStyles[array_rand($fontStyles)];
+        $item['color_tone'] = $colorTones[array_rand($colorTones)];
     }
     unset($item);
 
-    // Arranger i en spredt, levende sky
-    usort($items, function($a, $b) {
-        return $a['scatter_val'] <=> $b['scatter_val'];
-    });
+    // Fuldstændig tilfældig fordeling af emner så ord med flest indlæg spredes naturligt i skyen
+    shuffle($items);
 
     return $items;
 }
