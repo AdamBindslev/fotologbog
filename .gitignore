@@ -11,3 +11,7 @@ config.local.php
 # OS filer
 .DS_Store
 Thumbs.db
+
+# Deploy pakker
+deploy/
+deploy.zip
