@@ -318,7 +318,7 @@ function render_darkroom_style($canvas, $srcImg, array $post, array $fonts): voi
     $fontMono = is_file($fonts['courier']) ? $fonts['courier'] : null;
 
     $cam = !empty($post['exif_camera']) ? mb_strtoupper(trim($post['exif_camera']), 'UTF-8') : '35MM ANALOG';
-    $topFilmLabel = '▶ 24A     ' . $cam . '     SAFETY FILM';
+    $topFilmLabel = '24A     ' . $cam . '     SAFETY FILM';
     $dateStamp = date('d.m.Y', strtotime($post['published_at']));
     $bottomFilmLabel = '24     SYS.LOG // FOTO     ' . $dateStamp;
 
@@ -431,7 +431,7 @@ function render_notebook_style($canvas, $srcImg, array $post, array $fonts): voi
     $exif = format_exif($post);
     if ($exif) {
         $faintSepia = imagecolorallocate($canvas, 145, 133, 121);
-        gd_draw_single_line($canvas, $fontCourier, 10, $contentX, $h - 55, $faintSepia, '⌀ ' . $exif);
+        gd_draw_single_line($canvas, $fontCourier, 10, $contentX, $h - 55, $faintSepia, 'EXIF · ' . $exif);
     }
 }
 
