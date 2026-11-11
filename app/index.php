@@ -633,8 +633,8 @@ require_once __DIR__ . '/../includes/auth.php';
                         class="form-control" 
                         placeholder="f.eks. København, Nørrebro"
                     >
-                    <button type="button" class="btn-loc" id="gpsBtn" onclick="fetchGPSLocation()" title="Hent telefonens nuværende placering">
-                        <span id="gpsIcon">⌖</span> Her &amp; nu
+                    <button type="button" class="btn-loc" id="gpsBtn" onclick="fetchGPSLocation()" title="Hent enhedens nuværende placering">
+                        <span id="gpsIcon">⌖</span> Her
                     </button>
                 </div>
                 <input type="hidden" id="latInput">
