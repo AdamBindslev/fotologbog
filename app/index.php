@@ -17,6 +17,9 @@ require_once __DIR__ . '/../includes/auth.php';
     <meta name="theme-color" content="#242220">
     <link rel="apple-touch-icon" href="../assets/icons/icon-192.png">
 
+    <!-- EXIF Parser (JPEG, HEIC, WebP, PNG, TIFF) -->
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
+
     <style>
         :root {
             --bg-color: #faf8f5;
@@ -577,8 +580,20 @@ require_once __DIR__ . '/../includes/auth.php';
                     <img id="imagePreview" class="photo-preview" alt="Preview">
                 </div>
                 <div id="imageResInfo" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 4px; display: none;"></div>
-                <div id="exifPreviewBox" class="exif-preview-box">
-                    📷 <span id="exifPreviewText"></span>
+            </div>
+
+            <!-- Kameradata (EXIF) -->
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+                    <label class="form-label" style="margin-bottom: 0;">Kameradata (EXIF)</label>
+                    <span id="exifStatusBadge" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
+                        Udlæses automatisk fra foto
+                    </span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                    <input type="text" id="exifApertureInput" class="form-control" placeholder="f.eks. ƒ/2.8" title="Blænde">
+                    <input type="text" id="exifShutterInput" class="form-control" placeholder="f.eks. 1/250s" title="Lukkertid">
+                    <input type="text" id="exifIsoInput" class="form-control" placeholder="f.eks. ISO 400" title="ISO">
                 </div>
             </div>
 
@@ -602,7 +617,10 @@ require_once __DIR__ . '/../includes/auth.php';
 
             <!-- Dato & Tid -->
             <div class="form-group">
-                <label class="form-label" for="dateInput">Dato & Klokkeslæt</label>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+                    <label class="form-label" for="dateInput" style="margin-bottom: 0;">Dato &amp; Klokkeslæt</label>
+                    <span id="dateOriginBadge" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);"></span>
+                </div>
                 <input 
                     type="datetime-local" 
                     id="dateInput" 
@@ -966,142 +984,280 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
-// Letvægts klient-side EXIF-parser (Blænde, Lukkertid, ISO fra rå JPEG)
-function parseExifFromBuffer(buffer) {
-    const view = new DataView(buffer);
-    if (view.byteLength < 4) return null;
-    
-    // Tjek JPEG SOI (0xFFD8)
-    if (view.getUint16(0, false) !== 0xFFD8) {
-        return null;
+// Robust EXIF-udtrækker der benytter exifr UMD (hvis loaded) samt native fallback parser
+async function extractExifFromFile(file) {
+    let result = { aperture: null, shutter: null, iso: null, date: null, latitude: null, longitude: null };
+
+    // 1. Prøv exifr biblioteket (fuld understøttelse af JPEG, HEIC, PNG, WebP, TIFF)
+    if (window.exifr && typeof window.exifr.parse === 'function') {
+        try {
+            const data = await window.exifr.parse(file, {
+                tiff: true,
+                xmp: true,
+                exif: true,
+                gps: true,
+                pick: [
+                    'FNumber', 'ApertureValue', 
+                    'ExposureTime', 'ShutterSpeedValue', 
+                    'ISO', 'ISOSpeedRatings', 'PhotographicSensitivity', 
+                    'DateTimeOriginal', 'CreateDate', 'ModifyDate',
+                    'latitude', 'longitude'
+                ]
+            });
+
+            if (data) {
+                // Blænde
+                if (data.FNumber) {
+                    result.aperture = 'ƒ/' + (Math.round(data.FNumber * 10) / 10);
+                } else if (data.ApertureValue) {
+                    const f = Math.pow(Math.SQRT2, data.ApertureValue);
+                    result.aperture = 'ƒ/' + (Math.round(f * 10) / 10);
+                }
+
+                // Lukkertid
+                if (data.ExposureTime) {
+                    const exp = data.ExposureTime;
+                    if (exp < 1 && exp > 0) {
+                        result.shutter = '1/' + Math.round(1 / exp) + 's';
+                    } else {
+                        result.shutter = (Math.round(exp * 10) / 10) + 's';
+                    }
+                } else if (data.ShutterSpeedValue) {
+                    const exp = Math.pow(2, -data.ShutterSpeedValue);
+                    if (exp < 1 && exp > 0) {
+                        result.shutter = '1/' + Math.round(1 / exp) + 's';
+                    } else {
+                        result.shutter = (Math.round(exp * 10) / 10) + 's';
+                    }
+                }
+
+                // ISO
+                const isoVal = data.ISO || data.ISOSpeedRatings || data.PhotographicSensitivity;
+                if (isoVal) {
+                    const isoNum = Array.isArray(isoVal) ? isoVal[0] : isoVal;
+                    if (isoNum) result.iso = 'ISO ' + isoNum;
+                }
+
+                // Optagedato
+                const rawDate = data.DateTimeOriginal || data.CreateDate || data.ModifyDate;
+                if (rawDate) {
+                    if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+                        result.date = rawDate;
+                    } else if (typeof rawDate === 'string') {
+                        const m = rawDate.match(/^(\d{4})[:\-\/](\d{2})[:\-\/](\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?/);
+                        if (m) {
+                            result.date = new Date(m[1], m[2] - 1, m[3], m[4], m[5], m[6] || 0);
+                        }
+                    }
+                }
+
+                // GPS
+                if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+                    result.latitude = data.latitude;
+                    result.longitude = data.longitude;
+                }
+
+                if (result.aperture || result.shutter || result.iso || result.date) {
+                    return result;
+                }
+            }
+        } catch (err) {
+            console.warn('exifr parsing bemærkning:', err);
+        }
     }
+
+    // 2. Fallback: Parse buffer direkte hvis JPEG
+    try {
+        const buffer = await file.arrayBuffer();
+        const fallback = parseExifFallback(buffer);
+        if (fallback) {
+            result = Object.assign(result, fallback);
+        }
+    } catch (e) {
+        console.warn('Fallback exif note:', e);
+    }
+
+    return result;
+}
+
+// Robust rå JPEG EXIF parser der scanner alle segmenter og håndterer både Motorola og Intel TIFF
+function parseExifFallback(buffer) {
+    const view = new DataView(buffer);
+    if (view.byteLength < 4 || view.getUint16(0, false) !== 0xFFD8) return null;
 
     let offset = 2;
     const length = view.byteLength;
 
-    while (offset < length) {
-        if (view.getUint8(offset) !== 0xFF) return null;
+    while (offset < length - 4) {
+        if (view.getUint8(offset) !== 0xFF) {
+            offset++;
+            continue;
+        }
         const marker = view.getUint8(offset + 1);
+        if (marker === 0xDA || marker === 0xD9) break;
 
-        // APP1 marker (0xFFE1) indeholder EXIF
-        if (marker === 0xE1) {
+        const segLength = view.getUint16(offset + 2, false);
+        if (segLength < 2 || offset + 2 + segLength > length) break;
+
+        // APP1 (0xE1)
+        if (marker === 0xE1 && segLength >= 14) {
             const exifOffset = offset + 4;
-            if (exifOffset + 6 > length) return null;
             const isExif = view.getUint32(exifOffset, false) === 0x45786966 && view.getUint16(exifOffset + 4, false) === 0x0000;
-            if (!isExif) return null;
-
-            const tiffStart = exifOffset + 6;
-            const bigEndian = view.getUint16(tiffStart, false) === 0x4D4D;
-            
-            const ifd0Offset = tiffStart + view.getUint32(tiffStart + 4, bigEndian);
-            if (ifd0Offset >= length) return null;
-
-            let exifIfdOffset = null;
-            const numEntries0 = view.getUint16(ifd0Offset, bigEndian);
-            for (let i = 0; i < numEntries0; i++) {
-                const entryOffset = ifd0Offset + 2 + i * 12;
-                if (entryOffset + 12 > length) break;
-                const tag = view.getUint16(entryOffset, bigEndian);
-                if (tag === 0x8769) { // Exif IFD Pointer
-                    exifIfdOffset = tiffStart + view.getUint32(entryOffset + 8, bigEndian);
-                    break;
+            if (isExif) {
+                const tiffStart = exifOffset + 6;
+                const endianCode = view.getUint16(tiffStart, false);
+                const bigEndian = endianCode === 0x4D4D;
+                if (!bigEndian && endianCode !== 0x4949) {
+                    offset += 2 + segLength;
+                    continue;
                 }
-            }
 
-            if (!exifIfdOffset || exifIfdOffset >= length) return null;
+                const ifd0Offset = tiffStart + view.getUint32(tiffStart + 4, bigEndian);
+                if (ifd0Offset < length) {
+                    const result = { aperture: null, shutter: null, iso: null, date: null };
+                    let exifIfdOffset = null;
+                    const numEntries0 = view.getUint16(ifd0Offset, bigEndian);
 
-            const result = { aperture: null, shutter: null, iso: null };
-            const numExifEntries = view.getUint16(exifIfdOffset, bigEndian);
-
-            for (let i = 0; i < numExifEntries; i++) {
-                const entryOffset = exifIfdOffset + 2 + i * 12;
-                if (entryOffset + 12 > length) break;
-                const tag = view.getUint16(entryOffset, bigEndian);
-                const valOffset = tiffStart + view.getUint32(entryOffset + 8, bigEndian);
-
-                if (tag === 0x829D) { // FNumber (Blænde)
-                    if (valOffset + 8 <= length) {
-                        const num = view.getUint32(valOffset, bigEndian);
-                        const den = view.getUint32(valOffset + 4, bigEndian);
-                        if (den > 0) {
-                            const val = Math.round((num / den) * 10) / 10;
-                            result.aperture = 'ƒ/' + val;
+                    for (let i = 0; i < numEntries0; i++) {
+                        const entryOffset = ifd0Offset + 2 + i * 12;
+                        if (entryOffset + 12 > length) break;
+                        const tag = view.getUint16(entryOffset, bigEndian);
+                        if (tag === 0x8769) {
+                            exifIfdOffset = tiffStart + view.getUint32(entryOffset + 8, bigEndian);
+                        } else if (tag === 0x0132 && !result.date) {
+                            const dOffset = tiffStart + view.getUint32(entryOffset + 8, bigEndian);
+                            result.date = readExifDateString(view, dOffset, length);
                         }
                     }
-                } else if (tag === 0x829A) { // ExposureTime (Lukkertid)
-                    if (valOffset + 8 <= length) {
-                        const num = view.getUint32(valOffset, bigEndian);
-                        const den = view.getUint32(valOffset + 4, bigEndian);
-                        if (num > 0 && den > 0) {
-                            if (num < den) {
-                                const roundedDen = Math.round(den / num);
-                                result.shutter = '1/' + roundedDen + 's';
-                            } else {
-                                result.shutter = (Math.round((num / den) * 10) / 10) + 's';
+
+                    if (exifIfdOffset && exifIfdOffset + 2 < length) {
+                        const numExifEntries = view.getUint16(exifIfdOffset, bigEndian);
+                        for (let i = 0; i < numExifEntries; i++) {
+                            const entryOffset = exifIfdOffset + 2 + i * 12;
+                            if (entryOffset + 12 > length) break;
+                            const tag = view.getUint16(entryOffset, bigEndian);
+                            const valOffset = tiffStart + view.getUint32(entryOffset + 8, bigEndian);
+
+                            if (tag === 0x829D && !result.aperture) {
+                                if (valOffset + 8 <= length) {
+                                    const num = view.getUint32(valOffset, bigEndian);
+                                    const den = view.getUint32(valOffset + 4, bigEndian);
+                                    if (den > 0) result.aperture = 'ƒ/' + (Math.round((num / den) * 10) / 10);
+                                }
+                            } else if (tag === 0x9202 && !result.aperture) {
+                                if (valOffset + 8 <= length) {
+                                    const num = view.getUint32(valOffset, bigEndian);
+                                    const den = view.getUint32(valOffset + 4, bigEndian);
+                                    if (den > 0) {
+                                        const f = Math.pow(Math.SQRT2, num / den);
+                                        result.aperture = 'ƒ/' + (Math.round(f * 10) / 10);
+                                    }
+                                }
+                            } else if (tag === 0x829A && !result.shutter) {
+                                if (valOffset + 8 <= length) {
+                                    const num = view.getUint32(valOffset, bigEndian);
+                                    const den = view.getUint32(valOffset + 4, bigEndian);
+                                    if (num > 0 && den > 0) {
+                                        if (num < den) {
+                                            result.shutter = '1/' + Math.round(den / num) + 's';
+                                        } else {
+                                            result.shutter = (Math.round((num / den) * 10) / 10) + 's';
+                                        }
+                                    }
+                                }
+                            } else if (tag === 0x8827 || tag === 0x8832) {
+                                const entryType = view.getUint16(entryOffset + 2, bigEndian);
+                                let iso = 0;
+                                if (entryType === 3) {
+                                    iso = view.getUint16(entryOffset + 8, bigEndian);
+                                } else if (entryType === 4) {
+                                    iso = view.getUint32(entryOffset + 8, bigEndian);
+                                }
+                                if (iso > 0 && !result.iso) {
+                                    result.iso = 'ISO ' + iso;
+                                }
+                            } else if (tag === 0x9003 && !result.date) {
+                                result.date = readExifDateString(view, valOffset, length);
                             }
                         }
                     }
-                } else if (tag === 0x8827) { // ISO
-                    const iso = view.getUint16(entryOffset + 8, bigEndian);
-                    if (iso > 0) {
-                        result.iso = 'ISO ' + iso;
+
+                    if (result.aperture || result.shutter || result.iso || result.date) {
+                        return result;
                     }
                 }
             }
-
-            return result;
         }
 
-        const segLength = view.getUint16(offset + 2, false);
         offset += 2 + segLength;
     }
     return null;
 }
 
-function showExifPreview(data) {
-    const parts = [];
-    if (data.aperture) parts.push(data.aperture);
-    if (data.shutter) parts.push(data.shutter);
-    if (data.iso) parts.push(data.iso);
-    const box = document.getElementById('exifPreviewBox');
-    const txt = document.getElementById('exifPreviewText');
-    if (parts.length > 0) {
-        txt.textContent = parts.join(' · ');
-        box.style.display = 'block';
-    } else {
-        box.style.display = 'none';
+function readExifDateString(view, offset, maxLen) {
+    if (offset + 19 > maxLen) return null;
+    let str = '';
+    for (let i = 0; i < 19; i++) {
+        str += String.fromCharCode(view.getUint8(offset + i));
     }
-}
-
-function hideExifPreview() {
-    const box = document.getElementById('exifPreviewBox');
-    if (box) box.style.display = 'none';
+    const m = str.match(/^(\d{4})[:\-\/](\d{2})[:\-\/](\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (m) {
+        return new Date(m[1], m[2] - 1, m[3], m[4], m[5], m[6] || 0);
+    }
+    return null;
 }
 
 // Billedbehandling & Klient-optimering (Canvas)
-function handleImageSelected(e) {
+async function handleImageSelected(e) {
     const file = e.target.files[0];
     if (!file) return;
 
     // Prøv at udtrække EXIF direkte fra råfilen før canvas-komprimering
-    const readerExif = new FileReader();
-    readerExif.onload = function(exifEvent) {
-        try {
-            const parsed = parseExifFromBuffer(exifEvent.target.result);
-            if (parsed && (parsed.aperture || parsed.shutter || parsed.iso)) {
-                currentExifData = parsed;
-                showExifPreview(parsed);
-            } else {
-                currentExifData = null;
-                hideExifPreview();
+    try {
+        const exifData = await extractExifFromFile(file);
+        if (exifData) {
+            currentExifData = exifData;
+
+            // Udfyld EXIF felterne i skrivefladen
+            if (exifData.aperture) document.getElementById('exifApertureInput').value = exifData.aperture;
+            if (exifData.shutter) document.getElementById('exifShutterInput').value = exifData.shutter;
+            if (exifData.iso) document.getElementById('exifIsoInput').value = exifData.iso;
+
+            const parts = [exifData.aperture, exifData.shutter, exifData.iso].filter(Boolean);
+            const badge = document.getElementById('exifStatusBadge');
+            if (badge) {
+                if (parts.length > 0) {
+                    badge.textContent = '✓ Udlæst fra foto (' + parts.join(' · ') + ')';
+                    badge.style.color = 'var(--accent-red)';
+                } else {
+                    badge.textContent = 'Ingen EXIF fundet i fil – indtast evt. manuelt';
+                    badge.style.color = 'var(--text-muted)';
+                }
             }
-        } catch (err) {
-            console.warn('Exif note:', err);
-            currentExifData = null;
-            hideExifPreview();
+
+            // Hvis fotoet indeholder optagedato, opdater automatisk Dato & Klokkeslæt
+            if (exifData.date && exifData.date instanceof Date && !isNaN(exifData.date.getTime())) {
+                const d = exifData.date;
+                const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                document.getElementById('dateInput').value = localIso;
+
+                const dateBadge = document.getElementById('dateOriginBadge');
+                if (dateBadge) {
+                    const pad = n => String(n).padStart(2, '0');
+                    dateBadge.textContent = `✓ Foto optaget: ${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    dateBadge.style.color = 'var(--accent-red)';
+                }
+            }
+
+            // Hvis fotoet indeholder GPS-koordinater
+            if (exifData.latitude && exifData.longitude) {
+                document.getElementById('latInput').value = exifData.latitude;
+                document.getElementById('lonInput').value = exifData.longitude;
+            }
         }
-    };
-    readerExif.readAsArrayBuffer(file);
+    } catch (err) {
+        console.warn('EXIF udtræk bemærkning:', err);
+    }
 
     const reader = new FileReader();
     reader.onload = function(event) {
@@ -1375,9 +1531,9 @@ async function handleCreatePost(e) {
         published_at: document.getElementById('dateInput').value,
         image_data: compressedImageData,
         tags: selectedTags,
-        exif_aperture: currentExifData ? (currentExifData.aperture || '') : '',
-        exif_shutter: currentExifData ? (currentExifData.shutter || '') : '',
-        exif_iso: currentExifData ? (currentExifData.iso || '') : ''
+        exif_aperture: (document.getElementById('exifApertureInput')?.value || '').trim(),
+        exif_shutter: (document.getElementById('exifShutterInput')?.value || '').trim(),
+        exif_iso: (document.getElementById('exifIsoInput')?.value || '').trim()
     };
 
     try {
@@ -1393,7 +1549,18 @@ async function handleCreatePost(e) {
             currentExifData = null;
             selectedTags = [];
             renderSelectedTags();
-            hideExifPreview();
+            document.getElementById('exifApertureInput').value = '';
+            document.getElementById('exifShutterInput').value = '';
+            document.getElementById('exifIsoInput').value = '';
+            const exifBadge = document.getElementById('exifStatusBadge');
+            if (exifBadge) {
+                exifBadge.textContent = 'Udlæses automatisk fra foto';
+                exifBadge.style.color = 'var(--text-muted)';
+            }
+            const dateBadge = document.getElementById('dateOriginBadge');
+            if (dateBadge) {
+                dateBadge.textContent = '';
+            }
             document.getElementById('imagePreview').style.display = 'none';
             document.getElementById('photoPickerPrompt').style.display = 'block';
             document.getElementById('imageResInfo').style.display = 'none';

@@ -695,56 +695,135 @@ body {
 .index-cloud-area {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.85rem 1.15rem;
-    align-items: center;
-    padding: 1rem 0 2rem 0;
-    line-height: 2.2;
+    justify-content: center;
+    align-items: baseline;
+    gap: 1.1rem 1.65rem;
+    padding: 2rem 0.5rem 3.5rem 0.5rem;
+    line-height: 2.6;
+    position: relative;
+    max-width: 660px;
+    margin: 0 auto;
 }
 
 .index-cloud-item {
     display: inline-flex;
     align-items: baseline;
-    gap: 5px;
+    gap: 6px;
     text-decoration: none;
+    border-radius: 3px;
+    padding: 4px 10px;
+    margin-top: var(--cloud-drift, 0px);
+    transform: rotate(var(--cloud-rot, 0deg));
+    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.4, 1), box-shadow 0.18s ease, background 0.15s ease, color 0.15s ease;
+    will-change: transform;
+    border: 1px dashed transparent;
+    background: transparent;
+    position: relative;
+}
+
+/* Forskellige typografiske udtryk til det rodede sky-look */
+.index-cloud-item.style-mono {
     font-family: var(--font-mono);
-    color: var(--ink-black);
-    border-radius: 2px;
-    padding: 3px 8px;
-    transition: all 0.15s ease;
-    border-bottom: 1px dotted transparent;
+    letter-spacing: 0.02em;
 }
 
-.index-cloud-item.type-tag {
-    font-weight: 600;
+.index-cloud-item.style-typewriter {
+    font-family: var(--font-typewriter);
+    font-weight: 700;
+    letter-spacing: -0.01em;
 }
 
-.index-cloud-item.type-location {
+.index-cloud-item.style-serif {
+    font-family: var(--font-serif);
     font-style: italic;
+}
+
+.index-cloud-item.style-display {
+    font-family: var(--font-display);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+/* Farvetoner i analog blæk og stempler */
+.index-cloud-item.tone-ink {
+    color: var(--ink-black);
+}
+
+.index-cloud-item.tone-red {
+    color: var(--ink-red);
+}
+
+.index-cloud-item.tone-sepia {
+    color: #633e24;
+}
+
+.index-cloud-item.tone-faint {
     color: var(--ink-dark);
 }
 
+.index-cloud-item.type-tag {
+    border-color: rgba(30, 24, 20, 0.12);
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.index-cloud-item.type-location {
+    border-bottom: 1.5px dotted rgba(184, 51, 42, 0.35);
+}
+
 .index-cloud-item .cloud-count {
-    font-size: 0.65em;
+    font-family: var(--font-mono);
+    font-size: 0.62em;
     color: var(--ink-muted);
     font-weight: 400;
     vertical-align: super;
+    opacity: 0.85;
 }
 
-.index-cloud-item.weight-1 { font-size: 0.9rem; opacity: 0.8; }
-.index-cloud-item.weight-2 { font-size: 1.05rem; opacity: 0.9; }
-.index-cloud-item.weight-3 { font-size: 1.25rem; font-weight: 700; }
-.index-cloud-item.weight-4 { font-size: 1.5rem; font-weight: 700; color: var(--ink-black); }
-.index-cloud-item.weight-5 { font-size: 1.85rem; font-weight: 800; color: var(--ink-red); }
+/* Vægtning / hierarki */
+.index-cloud-item.weight-1 { 
+    font-size: 0.88rem; 
+    opacity: 0.82; 
+}
+
+.index-cloud-item.weight-2 { 
+    font-size: 1.08rem; 
+    opacity: 0.92; 
+}
+
+.index-cloud-item.weight-3 { 
+    font-size: 1.35rem; 
+    font-weight: 700; 
+}
+
+.index-cloud-item.weight-4 { 
+    font-size: 1.7rem; 
+    font-weight: 700; 
+    border-color: rgba(30, 24, 20, 0.25);
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.index-cloud-item.weight-5 { 
+    font-size: 2.15rem; 
+    font-weight: 800; 
+    color: var(--ink-red);
+    border: 1.5px solid var(--ink-red);
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 1px 2px 5px rgba(0, 0, 0, 0.06);
+}
 
 .index-cloud-item:hover {
-    color: var(--ink-red);
-    background: rgba(184, 51, 42, 0.08);
-    border-bottom-color: var(--ink-red);
-    transform: translateY(-2px);
+    color: var(--ink-red) !important;
+    background: #fff8eb !important;
+    border-color: var(--ink-red) !important;
+    border-style: solid !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+    transform: scale(1.15) rotate(0deg) translateY(-4px);
+    z-index: 20;
 }
 
 .index-cloud-item:hover .cloud-count {
     color: var(--ink-red);
+    opacity: 1;
 }
 
 .index-empty-state {

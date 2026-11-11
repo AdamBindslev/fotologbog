@@ -121,6 +121,32 @@ function init_db_schema(PDO $db): void {
         }
     }
 
+    // Normaliser datoformater i eksisterende indlæg til YYYY-MM-DD HH:MM:SS så sorteringen altid er 100% præcis
+    try {
+        $stmtDates = $db->query("SELECT id, published_at FROM posts WHERE published_at LIKE '%T%' OR published_at LIKE '%.%' OR published_at LIKE '%/%'");
+        $dirtyDates = $stmtDates ? $stmtDates->fetchAll() : [];
+        if (!empty($dirtyDates)) {
+            $updateDateStmt = $db->prepare("UPDATE posts SET published_at = :pub WHERE id = :id");
+            foreach ($dirtyDates as $dRow) {
+                $raw = trim((string)$dRow['published_at']);
+                $clean = str_replace('T', ' ', $raw);
+                if (preg_match('/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/', $clean, $m)) {
+                    $clean = sprintf('%04d-%02d-%02d %02d:%02d:%02d', 
+                        (int)$m[3], (int)$m[2], (int)$m[1], 
+                        (int)($m[4] ?? 12), (int)($m[5] ?? 0), (int)($m[6] ?? 0)
+                    );
+                }
+                $ts = strtotime($clean);
+                if ($ts) {
+                    $norm = date('Y-m-d H:i:s', $ts);
+                    $updateDateStmt->execute([':pub' => $norm, ':id' => $dRow['id']]);
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        // Ignorer eventuelle datomigration fejl
+    }
+
     // Settings tabel (til f.eks. brugerdefineret PIN eller profildata)
     $db->exec("
         CREATE TABLE IF NOT EXISTS settings (

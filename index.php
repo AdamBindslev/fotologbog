@@ -52,11 +52,14 @@ if ($filterTag !== '') {
 
 $dateRangeStr = '';
 if (!empty($posts)) {
-    $newestDate = $posts[0]['published_at'] ?? '';
-    $oldestDate = $posts[count($posts) - 1]['published_at'] ?? '';
-    if ($newestDate && $oldestDate) {
-        $d1 = format_analog_date($oldestDate);
-        $d2 = format_analog_date($newestDate);
+    $timestamps = array_filter(array_map(function($p) {
+        return strtotime($p['published_at'] ?? '');
+    }, $posts));
+    if (!empty($timestamps)) {
+        $minTs = min($timestamps);
+        $maxTs = max($timestamps);
+        $d1 = format_analog_date(date('Y-m-d H:i:s', $minTs));
+        $d2 = format_analog_date(date('Y-m-d H:i:s', $maxTs));
         $dateRangeStr = ($d1 === $d2) ? $d1 : ($d1 . ' — ' . $d2);
     }
 }
@@ -169,9 +172,10 @@ if (!empty($posts)) {
                     <div class="index-cloud-area">
                         <?php foreach ($indexItems as $item): ?>
                             <a href="<?= $item['url'] ?>" 
-                               class="index-cloud-item type-<?= $item['type'] ?> weight-<?= $item['weight'] ?>"
+                               class="index-cloud-item type-<?= $item['type'] ?> weight-<?= $item['weight'] ?> <?= $item['font_style'] ?> <?= $item['color_tone'] ?>"
+                               style="--cloud-rot: <?= $item['rot'] ?>deg; --cloud-drift: <?= $item['drift'] ?>px;"
                                title="<?= $item['type'] === 'tag' ? 'Emne' : 'Lokation' ?>: <?= htmlspecialchars($item['raw_name']) ?> (<?= $item['count'] ?> indlæg)">
-                                <?= htmlspecialchars($item['name']) ?>
+                                <span class="cloud-text"><?= htmlspecialchars($item['name']) ?></span>
                                 <span class="cloud-count">(<?= $item['count'] ?>)</span>
                             </a>
                         <?php endforeach; ?>

@@ -107,14 +107,7 @@ if ($action === 'create_post') {
     $location = trim((string)($input['location'] ?? ''));
     $latitude = isset($input['latitude']) && is_numeric($input['latitude']) ? (float)$input['latitude'] : null;
     $longitude = isset($input['longitude']) && is_numeric($input['longitude']) ? (float)$input['longitude'] : null;
-    $publishedAt = trim((string)($input['published_at'] ?? ''));
-
-    if (empty($publishedAt)) {
-        $publishedAt = date('Y-m-d H:i:s');
-    } else {
-        $timeVal = strtotime($publishedAt);
-        $publishedAt = $timeVal ? date('Y-m-d H:i:s', $timeVal) : date('Y-m-d H:i:s');
-    }
+    $publishedAt = normalize_datetime_input($input['published_at'] ?? '');
 
     if (empty($title)) {
         $title = 'Log ' . date('d.m.Y', strtotime($publishedAt));
@@ -247,7 +240,7 @@ if ($action === 'update_post') {
     $title = trim((string)($input['title'] ?? $post['title']));
     $content = trim((string)($input['content'] ?? $post['content']));
     $location = trim((string)($input['location'] ?? $post['location']));
-    $publishedAt = trim((string)($input['published_at'] ?? $post['published_at']));
+    $publishedAt = normalize_datetime_input($input['published_at'] ?? $post['published_at']);
     $latitude = isset($input['latitude']) && is_numeric($input['latitude']) ? (float)$input['latitude'] : $post['latitude'];
     $longitude = isset($input['longitude']) && is_numeric($input['longitude']) ? (float)$input['longitude'] : $post['longitude'];
 

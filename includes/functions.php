@@ -79,13 +79,37 @@ function slugify(string $text): string {
 }
 
 /**
- * Henter seneste indlæg med paginering
+ * Normaliserer enhver dato-streng til gyldig YYYY-MM-DD HH:MM:SS til SQLite
+ */
+function normalize_datetime_input(?string $inputStr): string {
+    $inputStr = trim((string)$inputStr);
+    if ($inputStr === '') {
+        return date('Y-m-d H:i:s');
+    }
+    // Udskift T (fra datetime-local) med mellemrum
+    $cleanStr = str_replace('T', ' ', $inputStr);
+    // Hvis der er prikker f.eks. "11.11.2026", konverter til "YYYY-MM-DD"
+    if (preg_match('/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/', $cleanStr, $m)) {
+        $cleanStr = sprintf('%04d-%02d-%02d %02d:%02d:%02d', 
+            (int)$m[3], (int)$m[2], (int)$m[1], 
+            (int)($m[4] ?? 12), (int)($m[5] ?? 0), (int)($m[6] ?? 0)
+        );
+    }
+    $timeVal = strtotime($cleanStr);
+    if ($timeVal) {
+        return date('Y-m-d H:i:s', $timeVal);
+    }
+    return date('Y-m-d H:i:s');
+}
+
+/**
+ * Henter seneste indlæg med paginering (altid nyeste øverst)
  */
 function get_recent_posts(int $limit = 10, int $offset = 0): array {
     $db = get_db();
     $stmt = $db->prepare("
         SELECT * FROM posts 
-        ORDER BY published_at DESC, id DESC 
+        ORDER BY datetime(published_at) DESC, published_at DESC, id DESC 
         LIMIT :limit OFFSET :offset
     ");
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
@@ -182,7 +206,7 @@ function get_posts_by_month(string $year, string $month): array {
     $stmt = $db->prepare("
         SELECT * FROM posts 
         WHERE published_at LIKE :pattern 
-        ORDER BY published_at DESC, id DESC
+        ORDER BY datetime(published_at) DESC, published_at DESC, id DESC
     ");
     $stmt->execute([':pattern' => $pattern]);
     return $stmt->fetchAll();
@@ -355,7 +379,7 @@ function get_all_locations_with_counts(): array {
 }
 
 /**
- * Henter et samlet indeks med tags og lokationer vægtet til en ord-sky
+ * Henter et samlet indeks med tags og lokationer vægtet til en levende, rodet ord-sky
  */
 function get_unified_index_items(): array {
     $tags = get_all_tags_with_counts();
@@ -390,19 +414,33 @@ function get_unified_index_items(): array {
         ];
     }
 
-    // Beregn en visuel vægt (1 til 5) til CSS font-størrelser
+    // Beregn en visuel vægt (1 til 5) samt organiske variations-parametre (hældning, drift, stil)
+    $rotations = [-3.5, -2.5, -1.8, -1.0, 0, 1.0, 1.8, 2.5, 3.5];
+    $drifts = [-8, -5, -3, 0, 3, 5, 8];
+    $fontStyles = ['style-mono', 'style-typewriter', 'style-serif', 'style-display'];
+    $colorTones = ['tone-ink', 'tone-red', 'tone-sepia', 'tone-faint'];
+
     foreach ($items as &$item) {
         $weight = 1;
         if ($maxCount > 1) {
             $weight = 1 + (int)round(($item['count'] - 1) / ($maxCount - 1) * 4);
         }
         $item['weight'] = max(1, min(5, $weight));
+
+        // Deterministisk hash sikrer en stabil visning ved genindlæsning
+        $h = abs(crc32($item['type'] . ':' . $item['raw_name']));
+        $item['rot'] = $rotations[$h % count($rotations)];
+        $item['drift'] = $drifts[($h >> 3) % count($drifts)];
+        $item['font_style'] = $fontStyles[($h >> 6) % count($fontStyles)];
+        $item['color_tone'] = $colorTones[($h >> 9) % count($colorTones)];
+        // Spredningsorden så skyen er et organisk miks i stedet for en lige alfabetisk kolonne
+        $item['scatter_val'] = ($h * 1664525 + 1013904223) % 100000;
     }
     unset($item);
 
-    // Sortér alfabetisk for et ægte register-look
+    // Arranger i en spredt, levende sky
     usort($items, function($a, $b) {
-        return strcasecmp($a['raw_name'], $b->raw_name ?? $b['raw_name']);
+        return $a['scatter_val'] <=> $b['scatter_val'];
     });
 
     return $items;
@@ -419,7 +457,7 @@ function get_posts_by_tag(string $tagSlug, int $limit = 10, int $offset = 0): ar
         JOIN post_tags pt ON pt.post_id = p.id
         JOIN tags t ON t.id = pt.tag_id
         WHERE t.slug = :slug
-        ORDER BY p.published_at DESC, p.id DESC
+        ORDER BY datetime(p.published_at) DESC, p.published_at DESC, p.id DESC
         LIMIT :limit OFFSET :offset
     ");
     $stmt->bindValue(':slug', $tagSlug, PDO::PARAM_STR);
@@ -464,7 +502,7 @@ function get_posts_by_location(string $location, int $limit = 10, int $offset = 
     $stmt = $db->prepare("
         SELECT * FROM posts 
         WHERE trim(location) = trim(:location)
-        ORDER BY published_at DESC, id DESC
+        ORDER BY datetime(published_at) DESC, published_at DESC, id DESC
         LIMIT :limit OFFSET :offset
     ");
     $stmt->bindValue(':location', $location, PDO::PARAM_STR);
@@ -510,13 +548,14 @@ function format_exif(array $post): ?string {
 }
 
 /**
- * Udtrækker blænde, lukkertid og ISO fra et lokalt billede via PHP exif hvis muligt
+ * Udtrækker blænde, lukkertid, ISO og optagedato fra et lokalt billede via PHP exif hvis muligt
  */
 function extract_exif_from_image_file(string $filePath): array {
     $result = [
         'aperture' => null,
         'shutter' => null,
-        'iso' => null
+        'iso' => null,
+        'date' => null
     ];
 
     if (!function_exists('exif_read_data') || !file_exists($filePath)) {
@@ -529,10 +568,10 @@ function extract_exif_from_image_file(string $filePath): array {
             return $result;
         }
 
-        // Blænde (FNumber)
+        // Blænde (FNumber eller ApertureValue)
         if (isset($exif['FNumber'])) {
             $fNumber = $exif['FNumber'];
-            if (is_string($fNumber) && str_contains($fNumber, '/')) {
+            if (is_string($fNumber) && strpos($fNumber, '/') !== false) {
                 $p = explode('/', $fNumber);
                 $val = (float)$p[0] / max(1, (float)$p[1]);
                 $result['aperture'] = 'ƒ/' . round($val, 1);
@@ -541,12 +580,20 @@ function extract_exif_from_image_file(string $filePath): array {
             }
         } elseif (isset($exif['COMPUTED']['ApertureFNumber'])) {
             $result['aperture'] = str_replace('f/', 'ƒ/', $exif['COMPUTED']['ApertureFNumber']);
+        } elseif (isset($exif['ApertureValue'])) {
+            $av = $exif['ApertureValue'];
+            if (is_string($av) && strpos($av, '/') !== false) {
+                $p = explode('/', $av);
+                $val = (float)$p[0] / max(1, (float)$p[1]);
+                $f = pow(sqrt(2), $val);
+                $result['aperture'] = 'ƒ/' . round($f, 1);
+            }
         }
 
-        // Lukkertid (ExposureTime)
+        // Lukkertid (ExposureTime eller ShutterSpeedValue)
         if (isset($exif['ExposureTime'])) {
             $exp = $exif['ExposureTime'];
-            if (is_string($exp) && str_contains($exp, '/')) {
+            if (is_string($exp) && strpos($exp, '/') !== false) {
                 $result['shutter'] = $exp . 's';
             } elseif (is_numeric($exp)) {
                 $expNum = (float)$exp;
@@ -557,14 +604,36 @@ function extract_exif_from_image_file(string $filePath): array {
                     $result['shutter'] = round($expNum, 1) . 's';
                 }
             }
+        } elseif (isset($exif['ShutterSpeedValue'])) {
+            $ssv = $exif['ShutterSpeedValue'];
+            if (is_string($ssv) && strpos($ssv, '/') !== false) {
+                $p = explode('/', $ssv);
+                $val = (float)$p[0] / max(1, (float)$p[1]);
+                $exp = pow(2, -$val);
+                if ($exp < 1 && $exp > 0) {
+                    $result['shutter'] = '1/' . round(1 / $exp) . 's';
+                } else {
+                    $result['shutter'] = round($exp, 1) . 's';
+                }
+            }
         }
 
-        // ISO (ISOSpeedRatings)
+        // ISO (ISOSpeedRatings, ISO eller PhotographicSensitivity)
         if (isset($exif['ISOSpeedRatings'])) {
             $iso = is_array($exif['ISOSpeedRatings']) ? $exif['ISOSpeedRatings'][0] : $exif['ISOSpeedRatings'];
             $result['iso'] = 'ISO ' . $iso;
+        } elseif (isset($exif['PhotographicSensitivity'])) {
+            $iso = is_array($exif['PhotographicSensitivity']) ? $exif['PhotographicSensitivity'][0] : $exif['PhotographicSensitivity'];
+            $result['iso'] = 'ISO ' . $iso;
         } elseif (isset($exif['ISO'])) {
             $result['iso'] = 'ISO ' . $exif['ISO'];
+        }
+
+        // Optagedato (DateTimeOriginal eller DateTime)
+        if (!empty($exif['DateTimeOriginal'])) {
+            $result['date'] = $exif['DateTimeOriginal'];
+        } elseif (!empty($exif['DateTime'])) {
+            $result['date'] = $exif['DateTime'];
         }
     } catch (Throwable $e) {
         // Ignorer eventuelle parse fejl på ufuldstændig EXIF
