@@ -36,6 +36,9 @@ $excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
 
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
     <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars(SITE_TITLE) ?> RSS Feed" href="<?= BASE_URL ?>/rss.php">
+
+    <!-- Counter.dev Analytics -->
+    <script src="https://cdn.counter.dev/script.js" data-id="9d6fe738-e118-4e38-b9a6-bc8a0281391f" data-utcoffset="1"></script>
 </head>
 <body>
 
