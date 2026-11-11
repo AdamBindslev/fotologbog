@@ -109,56 +109,14 @@ body {
         inset 0 1px 1px rgba(255, 255, 255, 0.25),
         inset 0 -2px 4px rgba(0, 0, 0, 0.3);
     position: relative;
-    padding: 2.5rem 2.75rem 3.5rem 5.5rem;
+    padding: 2.75rem 3rem 3.5rem 3rem;
     overflow: hidden;
 }
 
-/* Spiralryggen på venstre kant */
+/* Passepartout / Folio-mappe uden spiral */
 .notebook-spine {
-    position: absolute;
-    left: 1.25rem;
-    top: 1.5rem;
-    bottom: 1.5rem;
-    width: 38px;
-    pointer-events: none;
-    z-index: 5;
+    display: none;
 }
-
-/* Trådspiral med 3D-effekt */
-.spine-wire {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 14px;
-    width: 10px;
-    background: repeating-linear-gradient(
-        to bottom,
-        transparent 0px,
-        transparent 18px,
-        var(--wire-dark) 18px,
-        var(--wire-shine) 21px,
-        var(--wire-silver) 23px,
-        var(--wire-dark) 26px
-    );
-    filter: drop-shadow(2px 2px 2px rgba(0, 0, 0, 0.5));
-}
-
-/* Stansehuller (3-hole punch) */
-.punch-hole {
-    position: absolute;
-    left: 10px;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background-color: var(--desk-bg);
-    box-shadow: 
-        inset 2px 2px 5px var(--punch-shadow),
-        0 1px 1px rgba(255, 255, 255, 0.3);
-}
-
-.hole-top { top: 40px; }
-.hole-mid { top: calc(50% - 9px); }
-.hole-bot { bottom: 40px; }
 
 .notebook-content {
     position: relative;
@@ -255,18 +213,43 @@ body {
     gap: 3.5rem;
 }
 
+/* Arkiv-periode badge i toppen af oversigten */
+.archive-period-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.45rem 0.85rem;
+    margin-bottom: 2rem;
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px dashed var(--sheet-border);
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--ink-dark);
+    letter-spacing: 0.05em;
+}
+
+.archive-period-banner .period-dates {
+    color: var(--ink-red);
+    font-weight: 700;
+}
+
 .log-entry {
     background-color: var(--sheet-paper);
-    /* Fint linjeret "NARROW RULED" papirtekstur */
+    /* Fint linjeret 32px "NARROW RULED" papirtekstur med fast grundlinje */
     background-image: repeating-linear-gradient(
+        to bottom,
         transparent,
         transparent 31px,
         var(--sheet-rule) 31px,
         var(--sheet-rule) 32px
     );
+    background-position: 0 0;
     border: 1px solid var(--sheet-border);
     border-radius: 3px;
-    padding: 2.25rem 2.25rem 2rem 2.25rem;
+    padding: 32px 2.25rem 32px 2.25rem;
     box-shadow: 
         0 1px 3px rgba(0, 0, 0, 0.12),
         0 8px 24px rgba(0, 0, 0, 0.15);
@@ -302,7 +285,7 @@ body {
     font-size: 0.8rem;
     color: var(--ink-muted);
     border-bottom: 2px solid var(--ink-black);
-    padding-bottom: 0.65rem;
+    padding-bottom: 0.45rem;
     margin-bottom: 1.25rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -341,7 +324,7 @@ body {
     line-height: 1.22;
     letter-spacing: -0.015em;
     color: var(--ink-black);
-    margin: 0.75rem 0 1.5rem 0;
+    margin: 0.75rem 0 1.25rem 0;
 }
 
 .entry-title a {
@@ -355,33 +338,86 @@ body {
 }
 
 /* =========================================================
-   Fotomontering med Tape & Archival Border
+   Fotomontering med 5 Tape-variationer & Archival Ramme
    ========================================================= */
 .entry-photo-wrap {
-    margin: 1.75rem 0 2rem 0;
+    margin: 1.5rem 0 24px 0;
     background: #ffffff;
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    padding: 8px 8px 14px 8px;
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    padding: 10px 10px 16px 10px;
     box-shadow: 
         0 1px 3px rgba(0, 0, 0, 0.1),
         0 10px 25px -5px rgba(0, 0, 0, 0.2);
     position: relative;
-    border-radius: 1px;
+    border-radius: 2px;
 }
 
-/* Halvgennemsigtig vintage tape-strimmel i toppen */
+/* Halvgennemsigtig vintage tape-strimmel grundform */
 .photo-tape {
     position: absolute;
-    top: -11px;
-    left: 50%;
-    transform: translateX(-50%) rotate(-0.5deg);
-    width: 95px;
-    height: 24px;
-    background-color: rgba(245, 235, 205, 0.75);
-    border: 1px solid rgba(200, 185, 150, 0.6);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    backdrop-filter: blur(1px);
-    z-index: 2;
+    height: 25px;
+    background-color: rgba(246, 237, 212, 0.82);
+    border: 1px solid rgba(195, 178, 140, 0.55);
+    border-left: 1px dashed rgba(180, 160, 120, 0.4);
+    border-right: 1px dashed rgba(180, 160, 120, 0.4);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), inset 0 0 5px rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(1.5px);
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* Tape variant 1: Centreret i toppen med svagt venstre-vip */
+.tape-top-center-left {
+    top: -12px;
+    left: 48%;
+    transform: translateX(-50%) rotate(-1.8deg);
+    width: 98px;
+}
+
+/* Tape variant 2: Centreret i toppen med svagt højre-vip */
+.tape-top-center-right {
+    top: -12px;
+    left: 52%;
+    transform: translateX(-50%) rotate(2.2deg);
+    width: 92px;
+}
+
+/* Tape variant 3: To diagonale hjørner (top-venstre + bund-højre) */
+.tape-corner-tl {
+    top: -10px;
+    left: -16px;
+    transform: rotate(-38deg);
+    width: 76px;
+}
+.tape-corner-br {
+    bottom: -10px;
+    right: -16px;
+    transform: rotate(-40deg);
+    width: 76px;
+}
+
+/* Tape variant 4: Enkelt skrå tape i top-højre hjørne */
+.tape-corner-tr {
+    top: -10px;
+    right: -18px;
+    transform: rotate(38deg);
+    width: 86px;
+}
+
+/* Tape variant 5: To lodrette/lige strimler i begge tophjørner */
+.tape-top-left-straight {
+    top: -13px;
+    left: 26px;
+    transform: rotate(-0.5deg);
+    width: 58px;
+    height: 28px;
+}
+.tape-top-right-straight {
+    top: -13px;
+    right: 26px;
+    transform: rotate(1deg);
+    width: 58px;
+    height: 28px;
 }
 
 .entry-photo {
@@ -393,19 +429,48 @@ body {
     background-color: #f7f4ed;
 }
 
+/* Diskret retro EXIF-linje under billedet */
+.entry-photo-exif {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dotted rgba(0, 0, 0, 0.14);
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--ink-muted);
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+}
+
+.entry-photo-exif .exif-icon {
+    font-size: 0.8rem;
+    opacity: 0.75;
+}
+
+.entry-photo-exif .exif-data {
+    color: var(--ink-dark);
+    font-weight: 500;
+}
+
 /* =========================================================
-   Brødtekst / Tanker (Skrivemaskine-æstetik)
+   Brødtekst / Tanker låst på papirets linjer (32px baseline)
    ========================================================= */
 .entry-body {
-    margin: 1.6rem 0;
+    margin: 1.5rem 0;
     font-family: var(--font-typewriter);
-    font-size: 1.15rem;
-    line-height: 1.8;
+    font-size: 1.125rem;
+    line-height: 32px;
     color: var(--ink-black);
 }
 
 .entry-body p {
-    margin-bottom: 1.25rem;
+    line-height: 32px;
+    margin-bottom: 32px;
+    /* Placér skrivemaskine-skriften så bogstavernes bund hviler direkte på 32px-linjen */
+    position: relative;
+    top: 6px;
 }
 
 .entry-body p:last-child {
@@ -425,10 +490,11 @@ body {
 }
 
 .entry-body blockquote {
-    margin: 1.5rem 0;
+    margin: 32px 0;
     padding-left: 1.25rem;
     border-left: 3px solid var(--ink-red);
     font-style: italic;
+    line-height: 32px;
     color: var(--ink-muted);
 }
 
@@ -455,6 +521,238 @@ body {
     letter-spacing: 0.12em;
     color: var(--ink-faint);
     user-select: none;
+}
+
+/* Emne-tags som stempel-badges (erstatter THEME & NOTE) */
+.meta-tags {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.entry-tag-stamp {
+    display: inline-flex;
+    align-items: center;
+    border: 1.5px solid var(--ink-dark);
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--ink-black);
+    background: var(--sheet-paper);
+    transition: all 0.15s ease;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.entry-tag-stamp .tag-hash {
+    background: var(--ink-dark);
+    color: var(--sheet-paper);
+    padding: 0.18rem 0.42rem;
+    font-size: 0.8rem;
+    font-family: var(--font-display);
+    letter-spacing: 0.04em;
+    border-right: 1px solid var(--ink-dark);
+}
+
+.entry-tag-stamp .tag-label {
+    padding: 0.18rem 0.5rem;
+    color: var(--ink-black);
+}
+
+.entry-tag-stamp:hover {
+    transform: rotate(-1.5deg) scale(1.04);
+    border-color: var(--ink-red);
+    color: var(--ink-red);
+}
+
+.entry-tag-stamp:hover .tag-hash {
+    background: var(--ink-red);
+    border-color: var(--ink-red);
+}
+
+.entry-tag-stamp:hover .tag-label {
+    color: var(--ink-red);
+}
+
+/* =========================================================
+   Aktivt Filter Banner (Ved filtrering på emne eller lokation)
+   ========================================================= */
+.active-filter-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    background: var(--sheet-paper);
+    border: 2px dashed var(--sheet-border);
+    border-radius: 3px;
+    padding: 0.85rem 1.25rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    font-family: var(--font-mono);
+}
+
+.active-filter-banner .filter-info {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.active-filter-banner .filter-type {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--ink-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.active-filter-banner .filter-query {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--ink-red);
+}
+
+.active-filter-banner .filter-count {
+    font-size: 0.82rem;
+    color: var(--ink-muted);
+}
+
+.active-filter-banner .filter-reset-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--ink-dark);
+    border: 1px solid var(--ink-dark);
+    padding: 0.3rem 0.65rem;
+    border-radius: 2px;
+    background: transparent;
+    transition: all 0.15s ease;
+}
+
+.active-filter-banner .filter-reset-btn:hover {
+    background: var(--ink-red);
+    color: #ffffff;
+    border-color: var(--ink-red);
+}
+
+/* =========================================================
+   [ INDEKS ] - Register & Ord-sky (Emner & Lokationer)
+   ========================================================= */
+.index-notebook-sheet {
+    background-color: var(--sheet-paper);
+    background-image: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 31px,
+        var(--sheet-rule) 31px,
+        var(--sheet-rule) 32px
+    );
+    border: 1px solid var(--sheet-border);
+    border-radius: 3px;
+    padding: 36px 2.5rem;
+    box-shadow: 
+        0 1px 3px rgba(0, 0, 0, 0.12),
+        0 8px 24px rgba(0, 0, 0, 0.15);
+    position: relative;
+}
+
+.index-header-area {
+    border-bottom: 2px solid var(--ink-black);
+    padding-bottom: 0.75rem;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.index-title {
+    font-family: var(--font-serif);
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--ink-black);
+}
+
+.index-meta {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--ink-muted);
+    letter-spacing: 0.06em;
+}
+
+.index-cloud-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem 1.15rem;
+    align-items: center;
+    padding: 1rem 0 2rem 0;
+    line-height: 2.2;
+}
+
+.index-cloud-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    text-decoration: none;
+    font-family: var(--font-mono);
+    color: var(--ink-black);
+    border-radius: 2px;
+    padding: 3px 8px;
+    transition: all 0.15s ease;
+    border-bottom: 1px dotted transparent;
+}
+
+.index-cloud-item.type-tag {
+    font-weight: 600;
+}
+
+.index-cloud-item.type-location {
+    font-style: italic;
+    color: var(--ink-dark);
+}
+
+.index-cloud-item .cloud-count {
+    font-size: 0.65em;
+    color: var(--ink-muted);
+    font-weight: 400;
+    vertical-align: super;
+}
+
+.index-cloud-item.weight-1 { font-size: 0.9rem; opacity: 0.8; }
+.index-cloud-item.weight-2 { font-size: 1.05rem; opacity: 0.9; }
+.index-cloud-item.weight-3 { font-size: 1.25rem; font-weight: 700; }
+.index-cloud-item.weight-4 { font-size: 1.5rem; font-weight: 700; color: var(--ink-black); }
+.index-cloud-item.weight-5 { font-size: 1.85rem; font-weight: 800; color: var(--ink-red); }
+
+.index-cloud-item:hover {
+    color: var(--ink-red);
+    background: rgba(184, 51, 42, 0.08);
+    border-bottom-color: var(--ink-red);
+    transform: translateY(-2px);
+}
+
+.index-cloud-item:hover .cloud-count {
+    color: var(--ink-red);
+}
+
+.index-empty-state {
+    font-family: var(--font-typewriter);
+    font-size: 1.1rem;
+    color: var(--ink-muted);
+    padding: 2rem 0;
+    text-align: center;
 }
 
 /* Retro stempel-badge for permalinks */
@@ -586,17 +884,51 @@ body {
 }
 
 /* =========================================================
-   Pagination (Sidenavigation)
+   Pagination (Sidenavigation med dato-spænd)
    ========================================================= */
 .pagination {
     margin-top: 3.5rem;
-    padding-top: 1.25rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--ink-black);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
     font-family: var(--font-display);
     font-size: 1.25rem;
     letter-spacing: 0.08em;
+}
+
+.pagination-prev,
+.pagination-next {
+    flex: 1;
+}
+
+.pagination-next {
+    text-align: right;
+}
+
+.pagination-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: var(--font-mono);
+    text-align: center;
+}
+
+.pagination-dates {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--ink-black);
+    letter-spacing: 0.04em;
+}
+
+.pagination-count {
+    font-size: 0.78rem;
+    color: var(--ink-muted);
+    letter-spacing: 0.06em;
 }
 
 .pagination a {
@@ -607,6 +939,7 @@ body {
     border-radius: 2px;
     background: rgba(255, 255, 255, 0.15);
     transition: all 0.15s ease;
+    display: inline-block;
 }
 
 .pagination a:hover {
@@ -659,33 +992,16 @@ body {
     }
 
     .notebook-wrapper {
-        padding: 1.75rem 1.25rem 2.5rem 3.5rem;
+        padding: 1.75rem 1.25rem 2.25rem 1.25rem;
         border-radius: 10px;
-    }
-
-    .notebook-spine {
-        left: 0.6rem;
-        width: 28px;
-    }
-
-    .spine-wire {
-        left: 10px;
-        width: 8px;
-    }
-
-    .punch-hole {
-        left: 6px;
-        width: 15px;
-        height: 15px;
     }
 
     .site-title {
         font-size: 1.9rem;
     }
 
-
     .log-entry {
-        padding: 1.5rem 1.25rem 1.5rem 1.25rem;
+        padding: 24px 1.25rem 24px 1.25rem;
     }
 
     .entry-title {
@@ -708,7 +1024,7 @@ body {
 
 @media (max-width: 480px) {
     .notebook-wrapper {
-        padding: 1.5rem 0.85rem 2rem 2.75rem;
+        padding: 1.25rem 0.75rem 1.75rem 0.75rem;
     }
 
     .site-title {

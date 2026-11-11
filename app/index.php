@@ -401,6 +401,116 @@ require_once __DIR__ . '/../includes/auth.php';
             margin-bottom: 12px;
             text-transform: uppercase;
         }
+
+        /* Tag System */
+        .selected-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+            min-height: 28px;
+        }
+
+        .tag-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #242220;
+            color: #ffffff;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .tag-badge .btn-remove-tag {
+            cursor: pointer;
+            font-weight: bold;
+            opacity: 0.7;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .tag-badge .btn-remove-tag:hover {
+            opacity: 1;
+            color: var(--accent-red);
+        }
+
+        .recent-tags-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .recent-tag-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 4px 10px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            cursor: pointer;
+            color: var(--text-main);
+            transition: all 0.15s ease;
+        }
+
+        .recent-tag-chip:hover {
+            border-color: #242220;
+        }
+
+        .recent-tag-chip.active {
+            background: #242220;
+            color: #ffffff;
+            border-color: #242220;
+        }
+
+        /* EXIF Preview Box */
+        .exif-preview-box {
+            display: none;
+            margin-top: 8px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-main);
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.03);
+            border: 1px dashed var(--border-color);
+            border-radius: 6px;
+        }
+
+        /* Edit Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 16px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-card {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            max-width: 480px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        }
     </style>
 </head>
 <body>
@@ -467,6 +577,9 @@ require_once __DIR__ . '/../includes/auth.php';
                     <img id="imagePreview" class="photo-preview" alt="Preview">
                 </div>
                 <div id="imageResInfo" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 4px; display: none;"></div>
+                <div id="exifPreviewBox" class="exif-preview-box">
+                    📷 <span id="exifPreviewText"></span>
+                </div>
             </div>
 
             <!-- Lokation med GPS knap -->
@@ -517,6 +630,34 @@ require_once __DIR__ . '/../includes/auth.php';
                     class="form-control" 
                     placeholder="Dine tanker, betragtninger eller historien bag billedet..."
                 ></textarea>
+            </div>
+
+            <!-- Tags / Emner -->
+            <div class="form-group">
+                <label class="form-label" for="tagInput">
+                    Tags / Emner <span style="font-weight: 400; font-size: 11px; color: var(--text-muted);">(Maks 3 per indlæg)</span>
+                </label>
+                <div id="selectedTagsContainer" class="selected-tags-container"></div>
+                <div style="display: flex; gap: 8px;">
+                    <input 
+                        type="text" 
+                        id="tagInput" 
+                        class="form-control" 
+                        placeholder="Skriv nyt tag og tryk Enter..."
+                        onkeydown="handleTagInputKey(event)"
+                    >
+                    <button type="button" class="btn-small" onclick="addTagFromInput()" style="white-space: nowrap; padding: 0 14px; font-weight: 600;">
+                        + Tilføj
+                    </button>
+                </div>
+                <div id="recentTagsSection" style="margin-top: 10px;">
+                    <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); margin-bottom: 6px;">
+                        VÆLG BLANDT TIDLIGERE BRUGTE TAGS:
+                    </div>
+                    <div id="recentTagsContainer" class="recent-tags-chips">
+                        <span style="font-size: 11px; color: var(--text-muted);">Henter tags...</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Gem knap -->
@@ -585,6 +726,55 @@ require_once __DIR__ . '/../includes/auth.php';
 
 </div>
 
+<!-- Modal til redigering af indlæg -->
+<div id="editModal" class="modal-overlay" onclick="closeEditModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="font-family: var(--font-mono); font-size: 14px; text-transform: uppercase;">[ REDIGER INDLÆG ]</h3>
+            <button type="button" onclick="closeEditModal()" class="btn-small" style="padding: 4px 8px; font-weight: bold;">✕</button>
+        </div>
+        <form id="editForm" onsubmit="handleSaveEdit(event)">
+            <input type="hidden" id="editPostId">
+            <div class="form-group">
+                <label class="form-label" for="editTitleInput">Overskrift</label>
+                <input type="text" id="editTitleInput" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="editDateInput">Dato &amp; Klokkeslæt</label>
+                <input type="datetime-local" id="editDateInput" class="form-control" style="font-family: var(--font-mono); font-size: 14px;">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="editLocInput">Lokation</label>
+                <input type="text" id="editLocInput" class="form-control">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="editContentInput">Noter / Refleksion</label>
+                <textarea id="editContentInput" class="form-control" style="min-height: 90px;"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tags (Maks 3)</label>
+                <div id="editSelectedTagsContainer" class="selected-tags-container"></div>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="editTagInput" class="form-control" placeholder="Tilføj tag..." onkeydown="handleEditTagInputKey(event)">
+                    <button type="button" class="btn-small" onclick="addEditTagFromInput()" style="white-space: nowrap;">+ Tilføj</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Kameradata (EXIF)</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                    <input type="text" id="editExifAperture" class="form-control" placeholder="f.eks. ƒ/2.8" title="Blænde">
+                    <input type="text" id="editExifShutter" class="form-control" placeholder="f.eks. 1/250s" title="Lukkertid">
+                    <input type="text" id="editExifIso" class="form-control" placeholder="f.eks. ISO 400" title="ISO">
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn-primary" id="saveEditBtn" style="padding: 12px;">Gem ændringer</button>
+                <button type="button" class="btn-small" onclick="closeEditModal()" style="padding: 12px 18px;">Annuller</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Bottom Navigation Bar -->
 <nav class="bottom-nav" id="bottomNav" style="display: none;">
     <button class="tab-btn active" onclick="switchView('compose')">
@@ -642,6 +832,8 @@ function switchView(viewName) {
         document.getElementById('viewCompose').classList.add('active');
         document.getElementById('bottomNav').style.display = 'flex';
         document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        renderSelectedTags();
+        loadRecentTags();
     } else if (viewName === 'history') {
         document.getElementById('viewHistory').classList.add('active');
         document.getElementById('bottomNav').style.display = 'flex';
@@ -746,10 +938,158 @@ async function handleLogin(e) {
     }
 }
 
+// Tilstand for EXIF og Tags
+let currentExifData = null;
+let selectedTags = [];
+let recentTagsList = [];
+let editSelectedTags = [];
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// Letvægts klient-side EXIF-parser (Blænde, Lukkertid, ISO fra rå JPEG)
+function parseExifFromBuffer(buffer) {
+    const view = new DataView(buffer);
+    if (view.byteLength < 4) return null;
+    
+    // Tjek JPEG SOI (0xFFD8)
+    if (view.getUint16(0, false) !== 0xFFD8) {
+        return null;
+    }
+
+    let offset = 2;
+    const length = view.byteLength;
+
+    while (offset < length) {
+        if (view.getUint8(offset) !== 0xFF) return null;
+        const marker = view.getUint8(offset + 1);
+
+        // APP1 marker (0xFFE1) indeholder EXIF
+        if (marker === 0xE1) {
+            const exifOffset = offset + 4;
+            if (exifOffset + 6 > length) return null;
+            const isExif = view.getUint32(exifOffset, false) === 0x45786966 && view.getUint16(exifOffset + 4, false) === 0x0000;
+            if (!isExif) return null;
+
+            const tiffStart = exifOffset + 6;
+            const bigEndian = view.getUint16(tiffStart, false) === 0x4D4D;
+            
+            const ifd0Offset = tiffStart + view.getUint32(tiffStart + 4, bigEndian);
+            if (ifd0Offset >= length) return null;
+
+            let exifIfdOffset = null;
+            const numEntries0 = view.getUint16(ifd0Offset, bigEndian);
+            for (let i = 0; i < numEntries0; i++) {
+                const entryOffset = ifd0Offset + 2 + i * 12;
+                if (entryOffset + 12 > length) break;
+                const tag = view.getUint16(entryOffset, bigEndian);
+                if (tag === 0x8769) { // Exif IFD Pointer
+                    exifIfdOffset = tiffStart + view.getUint32(entryOffset + 8, bigEndian);
+                    break;
+                }
+            }
+
+            if (!exifIfdOffset || exifIfdOffset >= length) return null;
+
+            const result = { aperture: null, shutter: null, iso: null };
+            const numExifEntries = view.getUint16(exifIfdOffset, bigEndian);
+
+            for (let i = 0; i < numExifEntries; i++) {
+                const entryOffset = exifIfdOffset + 2 + i * 12;
+                if (entryOffset + 12 > length) break;
+                const tag = view.getUint16(entryOffset, bigEndian);
+                const valOffset = tiffStart + view.getUint32(entryOffset + 8, bigEndian);
+
+                if (tag === 0x829D) { // FNumber (Blænde)
+                    if (valOffset + 8 <= length) {
+                        const num = view.getUint32(valOffset, bigEndian);
+                        const den = view.getUint32(valOffset + 4, bigEndian);
+                        if (den > 0) {
+                            const val = Math.round((num / den) * 10) / 10;
+                            result.aperture = 'ƒ/' + val;
+                        }
+                    }
+                } else if (tag === 0x829A) { // ExposureTime (Lukkertid)
+                    if (valOffset + 8 <= length) {
+                        const num = view.getUint32(valOffset, bigEndian);
+                        const den = view.getUint32(valOffset + 4, bigEndian);
+                        if (num > 0 && den > 0) {
+                            if (num < den) {
+                                const roundedDen = Math.round(den / num);
+                                result.shutter = '1/' + roundedDen + 's';
+                            } else {
+                                result.shutter = (Math.round((num / den) * 10) / 10) + 's';
+                            }
+                        }
+                    }
+                } else if (tag === 0x8827) { // ISO
+                    const iso = view.getUint16(entryOffset + 8, bigEndian);
+                    if (iso > 0) {
+                        result.iso = 'ISO ' + iso;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        const segLength = view.getUint16(offset + 2, false);
+        offset += 2 + segLength;
+    }
+    return null;
+}
+
+function showExifPreview(data) {
+    const parts = [];
+    if (data.aperture) parts.push(data.aperture);
+    if (data.shutter) parts.push(data.shutter);
+    if (data.iso) parts.push(data.iso);
+    const box = document.getElementById('exifPreviewBox');
+    const txt = document.getElementById('exifPreviewText');
+    if (parts.length > 0) {
+        txt.textContent = parts.join(' · ');
+        box.style.display = 'block';
+    } else {
+        box.style.display = 'none';
+    }
+}
+
+function hideExifPreview() {
+    const box = document.getElementById('exifPreviewBox');
+    if (box) box.style.display = 'none';
+}
+
 // Billedbehandling & Klient-optimering (Canvas)
 function handleImageSelected(e) {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Prøv at udtrække EXIF direkte fra råfilen før canvas-komprimering
+    const readerExif = new FileReader();
+    readerExif.onload = function(exifEvent) {
+        try {
+            const parsed = parseExifFromBuffer(exifEvent.target.result);
+            if (parsed && (parsed.aperture || parsed.shutter || parsed.iso)) {
+                currentExifData = parsed;
+                showExifPreview(parsed);
+            } else {
+                currentExifData = null;
+                hideExifPreview();
+            }
+        } catch (err) {
+            console.warn('Exif note:', err);
+            currentExifData = null;
+            hideExifPreview();
+        }
+    };
+    readerExif.readAsArrayBuffer(file);
 
     const reader = new FileReader();
     reader.onload = function(event) {
@@ -794,6 +1134,151 @@ function handleImageSelected(e) {
         img.src = event.target.result;
     };
     reader.readAsDataURL(file);
+}
+
+// Tags håndtering i Compose
+async function loadRecentTags() {
+    try {
+        const res = await apiFetch('get_tags');
+        if (res && res.tags) {
+            recentTagsList = res.tags;
+            renderRecentTags();
+        }
+    } catch (e) {
+        console.warn('Kunne ikke hente tags:', e);
+    }
+}
+
+function renderRecentTags() {
+    const container = document.getElementById('recentTagsContainer');
+    if (!container) return;
+    if (recentTagsList.length === 0) {
+        container.innerHTML = '<span style="font-size: 11px; color: var(--text-muted);">Ingen tidligere tags</span>';
+        return;
+    }
+
+    container.innerHTML = recentTagsList.map(t => {
+        const isSelected = selectedTags.some(st => st.toLowerCase() === t.name.toLowerCase());
+        return `
+            <button type="button" 
+                    class="recent-tag-chip ${isSelected ? 'active' : ''}" 
+                    onclick="toggleTag('${escapeHtml(t.name)}')">
+                #${escapeHtml(t.name)} ${isSelected ? '✓' : ''}
+            </button>
+        `;
+    }).join('');
+}
+
+function renderSelectedTags() {
+    const container = document.getElementById('selectedTagsContainer');
+    if (!container) return;
+    if (selectedTags.length === 0) {
+        container.innerHTML = '<span style="font-size: 12px; color: var(--text-muted); font-style: italic;">Ingen tags valgt</span>';
+        renderRecentTags();
+        return;
+    }
+
+    container.innerHTML = selectedTags.map(t => `
+        <span class="tag-badge">
+            #${escapeHtml(t)}
+            <span class="btn-remove-tag" onclick="removeTag('${escapeHtml(t)}')" title="Fjern">&times;</span>
+        </span>
+    `).join('');
+
+    renderRecentTags();
+}
+
+function addTag(rawTag) {
+    let tag = rawTag.trim().replace(/^#+/, '').trim();
+    if (!tag) return;
+    if (selectedTags.length >= 3) {
+        showAlert('Du kan højst vælge 3 tags per indlæg', 'error', 3000);
+        return;
+    }
+    const lower = tag.toLowerCase();
+    if (selectedTags.some(t => t.toLowerCase() === lower)) {
+        return;
+    }
+    selectedTags.push(tag);
+    renderSelectedTags();
+}
+
+function removeTag(tag) {
+    selectedTags = selectedTags.filter(t => t.toLowerCase() !== tag.toLowerCase());
+    renderSelectedTags();
+}
+
+function toggleTag(tag) {
+    if (selectedTags.some(t => t.toLowerCase() === tag.toLowerCase())) {
+        removeTag(tag);
+    } else {
+        addTag(tag);
+    }
+}
+
+function addTagFromInput() {
+    const input = document.getElementById('tagInput');
+    const val = input.value.trim();
+    if (val) {
+        addTag(val);
+        input.value = '';
+    }
+}
+
+function handleTagInputKey(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        addTagFromInput();
+    }
+}
+
+// Tags håndtering i Edit modal
+function renderEditSelectedTags() {
+    const container = document.getElementById('editSelectedTagsContainer');
+    if (!container) return;
+    if (editSelectedTags.length === 0) {
+        container.innerHTML = '<span style="font-size: 12px; color: var(--text-muted); font-style: italic;">Ingen tags</span>';
+        return;
+    }
+    container.innerHTML = editSelectedTags.map(t => `
+        <span class="tag-badge">
+            #${escapeHtml(t)}
+            <span class="btn-remove-tag" onclick="removeEditTag('${escapeHtml(t)}')">&times;</span>
+        </span>
+    `).join('');
+}
+
+function addEditTag(rawTag) {
+    let tag = rawTag.trim().replace(/^#+/, '').trim();
+    if (!tag) return;
+    if (editSelectedTags.length >= 3) {
+        showAlert('Højst 3 tags per indlæg', 'error', 2500);
+        return;
+    }
+    if (editSelectedTags.some(t => t.toLowerCase() === tag.toLowerCase())) return;
+    editSelectedTags.push(tag);
+    renderEditSelectedTags();
+}
+
+function removeEditTag(tag) {
+    editSelectedTags = editSelectedTags.filter(t => t.toLowerCase() !== tag.toLowerCase());
+    renderEditSelectedTags();
+}
+
+function addEditTagFromInput() {
+    const input = document.getElementById('editTagInput');
+    const val = input.value.trim();
+    if (val) {
+        addEditTag(val);
+        input.value = '';
+    }
+}
+
+function handleEditTagInputKey(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        addEditTagFromInput();
+    }
 }
 
 // Hent GPS Lokation & Reverse Geocoding
@@ -876,7 +1361,11 @@ async function handleCreatePost(e) {
         latitude: document.getElementById('latInput').value,
         longitude: document.getElementById('lonInput').value,
         published_at: document.getElementById('dateInput').value,
-        image_data: compressedImageData
+        image_data: compressedImageData,
+        tags: selectedTags,
+        exif_aperture: currentExifData ? (currentExifData.aperture || '') : '',
+        exif_shutter: currentExifData ? (currentExifData.shutter || '') : '',
+        exif_iso: currentExifData ? (currentExifData.iso || '') : ''
     };
 
     try {
@@ -889,10 +1378,15 @@ async function handleCreatePost(e) {
             showAlert('✓ Dit indlæg er gemt i logbogen!', 'success', 4000);
             document.getElementById('postForm').reset();
             compressedImageData = null;
+            currentExifData = null;
+            selectedTags = [];
+            renderSelectedTags();
+            hideExifPreview();
             document.getElementById('imagePreview').style.display = 'none';
             document.getElementById('photoPickerPrompt').style.display = 'block';
             document.getElementById('imageResInfo').style.display = 'none';
             setDefaultDate();
+            loadRecentTags();
         }
     } catch (err) {
         showAlert(err.message || 'Fejl under gemning', 'error');
@@ -919,15 +1413,18 @@ async function loadPostsHistory() {
             data.posts.forEach(p => {
                 const imgUrl = '../uploads/' + p.image_path;
                 const dateStr = p.published_at.substring(0, 10);
+                const tagNames = (p.tags || []).map(t => '#' + t.name).join(' ');
                 html += `
                     <div class="history-item" id="hist-${p.id}">
                         <img src="${imgUrl}" class="history-thumb" alt="">
                         <div class="history-info">
-                            <div class="history-title">${p.title}</div>
-                            <div class="history-date">[${dateStr}] ${p.location ? '• ' + p.location : ''}</div>
+                            <div class="history-title">${escapeHtml(p.title)}</div>
+                            <div class="history-date">[${dateStr}] ${p.location ? '• ' + escapeHtml(p.location) : ''}</div>
+                            ${tagNames ? `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(tagNames)}</div>` : ''}
                         </div>
                         <div class="history-actions">
                             <a href="../post.php?p=${p.uid || p.id}" target="_blank" class="btn-small" style="text-decoration:none;">Vis</a>
+                            <button onclick="openEditModal(${p.id})" class="btn-small">Rediger</button>
                             <button onclick="deletePost(${p.id})" class="btn-small btn-danger">Slet</button>
                         </div>
                     </div>
@@ -937,6 +1434,78 @@ async function loadPostsHistory() {
         }
     } catch (e) {
         container.innerHTML = `<p style="color: var(--accent-red);">${e.message || 'Kunne ikke hente indlæg'}</p>`;
+    }
+}
+
+// Rediger indlæg modal logik
+async function openEditModal(id) {
+    try {
+        const data = await apiFetch('get_post&id=' + id);
+        if (!data || !data.post) return;
+        const p = data.post;
+        document.getElementById('editPostId').value = p.id;
+        document.getElementById('editTitleInput').value = p.title || '';
+        document.getElementById('editLocInput').value = p.location || '';
+        document.getElementById('editContentInput').value = p.content || '';
+        
+        if (p.published_at) {
+            const dt = p.published_at.replace(' ', 'T').substring(0, 16);
+            document.getElementById('editDateInput').value = dt;
+        }
+
+        editSelectedTags = (p.tags || []).map(t => t.name);
+        renderEditSelectedTags();
+
+        document.getElementById('editExifAperture').value = p.exif_aperture || '';
+        document.getElementById('editExifShutter').value = p.exif_shutter || '';
+        document.getElementById('editExifIso').value = p.exif_iso || '';
+
+        document.getElementById('editModal').classList.add('active');
+    } catch (e) {
+        showAlert('Kunne ikke hente indlæg: ' + e.message, 'error');
+    }
+}
+
+function closeEditModal(e) {
+    if (e && e.target !== document.getElementById('editModal') && e.type === 'click') return;
+    document.getElementById('editModal').classList.remove('active');
+}
+
+async function handleSaveEdit(e) {
+    e.preventDefault();
+    const id = document.getElementById('editPostId').value;
+    const btn = document.getElementById('saveEditBtn');
+    btn.disabled = true;
+    btn.textContent = 'Gemmer...';
+
+    const payload = {
+        id: id,
+        title: document.getElementById('editTitleInput').value,
+        location: document.getElementById('editLocInput').value,
+        content: document.getElementById('editContentInput').value,
+        published_at: document.getElementById('editDateInput').value,
+        tags: editSelectedTags,
+        exif_aperture: document.getElementById('editExifAperture').value,
+        exif_shutter: document.getElementById('editExifShutter').value,
+        exif_iso: document.getElementById('editExifIso').value
+    };
+
+    try {
+        const data = await apiFetch('update_post', {
+            method: 'POST',
+            body: payload
+        });
+        if (data.success) {
+            showAlert('✓ Indlæg opdateret!', 'success', 3000);
+            closeEditModal();
+            loadPostsHistory();
+            loadRecentTags();
+        }
+    } catch (err) {
+        showAlert(err.message || 'Fejl under opdatering', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Gem ændringer';
     }
 }
 

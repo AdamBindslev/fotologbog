@@ -65,17 +65,47 @@ function init_db_schema(PDO $db): void {
 
     // Tjek om 'uid' kolonnen findes i en eksisterende tabel
     $cols = $db->query("PRAGMA table_info(posts)")->fetchAll();
-    $hasUid = false;
+    $existingCols = [];
     foreach ($cols as $col) {
-        if (($col['name'] ?? '') === 'uid') {
-            $hasUid = true;
-            break;
-        }
+        $existingCols[] = $col['name'] ?? '';
     }
-    if (!$hasUid) {
+
+    if (!in_array('uid', $existingCols)) {
         $db->exec("ALTER TABLE posts ADD COLUMN uid TEXT");
     }
     $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_uid ON posts(uid)");
+
+    // Tilføj EXIF-kolonner til posts hvis de ikke findes
+    if (!in_array('exif_aperture', $existingCols)) {
+        $db->exec("ALTER TABLE posts ADD COLUMN exif_aperture TEXT");
+    }
+    if (!in_array('exif_shutter', $existingCols)) {
+        $db->exec("ALTER TABLE posts ADD COLUMN exif_shutter TEXT");
+    }
+    if (!in_array('exif_iso', $existingCols)) {
+        $db->exec("ALTER TABLE posts ADD COLUMN exif_iso TEXT");
+    }
+
+    // Tags & Post-Tags tabeller til emner
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            slug TEXT NOT NULL UNIQUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_tags_slug ON tags(slug);
+
+        CREATE TABLE IF NOT EXISTS post_tags (
+            post_id INTEGER NOT NULL,
+            tag_id INTEGER NOT NULL,
+            PRIMARY KEY (post_id, tag_id),
+            FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_post_tags_post ON post_tags(post_id);
+        CREATE INDEX IF NOT EXISTS idx_post_tags_tag ON post_tags(tag_id);
+    ");
 
     // Udfyld manglende uid'er for eksisterende rækker så permalinks altid findes
     $stmtMissing = $db->query("SELECT id, published_at FROM posts WHERE uid IS NULL OR uid = ''");

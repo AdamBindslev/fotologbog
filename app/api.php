@@ -138,6 +138,18 @@ if ($action === 'create_post') {
         json_reply(['error' => $e->getMessage()], 400);
     }
 
+    // Håndter EXIF-data (kan sendes fra app'en eller udtrækkes fra billedfil)
+    $exifAperture = trim((string)($input['exif_aperture'] ?? ''));
+    $exifShutter = trim((string)($input['exif_shutter'] ?? ''));
+    $exifIso = trim((string)($input['exif_iso'] ?? ''));
+
+    if (empty($exifAperture) && empty($exifShutter) && empty($exifIso)) {
+        $extractedExif = extract_exif_from_image_file(UPLOADS_DIR . '/' . $imagePath);
+        $exifAperture = $extractedExif['aperture'] ?? null;
+        $exifShutter = $extractedExif['shutter'] ?? null;
+        $exifIso = $extractedExif['iso'] ?? null;
+    }
+
     $slug = slugify($title);
     $db = get_db();
 
@@ -151,8 +163,8 @@ if ($action === 'create_post') {
     }
 
     $stmt = $db->prepare("
-        INSERT INTO posts (uid, title, slug, content, image_path, location, latitude, longitude, published_at, created_at, updated_at)
-        VALUES (:uid, :title, :slug, :content, :image_path, :location, :latitude, :longitude, :published_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO posts (uid, title, slug, content, image_path, location, latitude, longitude, published_at, exif_aperture, exif_shutter, exif_iso, created_at, updated_at)
+        VALUES (:uid, :title, :slug, :content, :image_path, :location, :latitude, :longitude, :published_at, :exif_aperture, :exif_shutter, :exif_iso, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     ");
 
     $success = $stmt->execute([
@@ -164,11 +176,24 @@ if ($action === 'create_post') {
         ':location' => $location,
         ':latitude' => $latitude,
         ':longitude' => $longitude,
-        ':published_at' => $publishedAt
+        ':published_at' => $publishedAt,
+        ':exif_aperture' => $exifAperture ?: null,
+        ':exif_shutter' => $exifShutter ?: null,
+        ':exif_iso' => $exifIso ?: null
     ]);
 
     if ($success) {
-        $newId = $db->lastInsertId();
+        $newId = (int)$db->lastInsertId();
+
+        // Gem tags hvis angivet (array eller kommasepareret streng)
+        $tagsInput = $input['tags'] ?? [];
+        if (is_string($tagsInput)) {
+            $tagsInput = explode(',', $tagsInput);
+        }
+        if (is_array($tagsInput)) {
+            set_post_tags($newId, $tagsInput);
+        }
+
         json_reply([
             'success' => true,
             'id' => $newId,
@@ -184,6 +209,11 @@ if ($action === 'create_post') {
 // 4. Hent liste af indlæg (til admin-oversigt)
 if ($action === 'get_posts') {
     $posts = get_recent_posts(50, 0);
+    foreach ($posts as &$p) {
+        $p['tags'] = get_post_tags((int)$p['id']);
+        $p['exif_formatted'] = format_exif($p);
+    }
+    unset($p);
     json_reply(['posts' => $posts]);
 }
 
@@ -192,10 +222,18 @@ if ($action === 'get_post') {
     $id = (int)($input['id'] ?? 0);
     $post = get_post_by_id($id);
     if ($post) {
+        $post['tags'] = get_post_tags($id);
+        $post['exif_formatted'] = format_exif($post);
         json_reply(['post' => $post]);
     } else {
         json_reply(['error' => 'Indlægget findes ikke'], 404);
     }
+}
+
+// Hent alle brugte tags (til hurtig-chips i skrivefladen)
+if ($action === 'get_tags') {
+    $tags = get_all_tags_with_counts();
+    json_reply(['tags' => $tags]);
 }
 
 // 6. Opdater et eksisterende indlæg
@@ -246,6 +284,35 @@ if ($action === 'update_post') {
         ':image_path' => $imagePath,
         ':id' => $id
     ]);
+
+    // Opdater tags hvis sendt med
+    if (isset($input['tags'])) {
+        $tagsInput = $input['tags'];
+        if (is_string($tagsInput)) {
+            $tagsInput = explode(',', $tagsInput);
+        }
+        if (is_array($tagsInput)) {
+            set_post_tags($id, $tagsInput);
+        }
+    }
+
+    // Opdater EXIF hvis sendt med
+    if (isset($input['exif_aperture']) || isset($input['exif_shutter']) || isset($input['exif_iso'])) {
+        $exifAperture = trim((string)($input['exif_aperture'] ?? ($post['exif_aperture'] ?? '')));
+        $exifShutter = trim((string)($input['exif_shutter'] ?? ($post['exif_shutter'] ?? '')));
+        $exifIso = trim((string)($input['exif_iso'] ?? ($post['exif_iso'] ?? '')));
+        $stmtExif = $db->prepare("
+            UPDATE posts 
+            SET exif_aperture = :ap, exif_shutter = :sh, exif_iso = :iso 
+            WHERE id = :id
+        ");
+        $stmtExif->execute([
+            ':ap' => $exifAperture ?: null,
+            ':sh' => $exifShutter ?: null,
+            ':iso' => $exifIso ?: null,
+            ':id' => $id
+        ]);
+    }
 
     json_reply(['success' => true, 'message' => 'Indlægget er opdateret']);
 }
