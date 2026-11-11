@@ -53,18 +53,20 @@ function is_ip_rate_limited(string $ip): array {
  */
 function record_failed_login(string $ip): int {
     $db = get_db();
-    $stmt = $db->prepare("
-        INSERT INTO login_attempts (ip, attempts, last_attempt) 
-        VALUES (:ip, 1, :now)
-        ON CONFLICT(ip) DO UPDATE SET 
-            attempts = attempts + 1,
-            last_attempt = :now
-    ");
-    $stmt->execute([':ip' => $ip, ':now' => time()]);
+    $now = time();
+    $stmt = $db->prepare("SELECT attempts FROM login_attempts WHERE ip = :ip");
+    $stmt->execute([':ip' => $ip]);
+    $current = $stmt->fetchColumn();
 
-    $stmtCheck = $db->prepare("SELECT attempts FROM login_attempts WHERE ip = :ip");
-    $stmtCheck->execute([':ip' => $ip]);
-    return (int)$stmtCheck->fetchColumn();
+    if ($current !== false) {
+        $stmtUp = $db->prepare("UPDATE login_attempts SET attempts = attempts + 1, last_attempt = :now WHERE ip = :ip");
+        $stmtUp->execute([':now' => $now, ':ip' => $ip]);
+        return (int)$current + 1;
+    } else {
+        $stmtIn = $db->prepare("INSERT INTO login_attempts (ip, attempts, last_attempt) VALUES (:ip, 1, :now)");
+        $stmtIn->execute([':ip' => $ip, ':now' => $now]);
+        return 1;
+    }
 }
 
 /**
@@ -93,11 +95,7 @@ function is_lockdown_enabled(): bool {
 function set_lockdown(bool $enabled): bool {
     $db = get_db();
     $val = $enabled ? '1' : '0';
-    $stmt = $db->prepare("
-        INSERT INTO settings (key, value) 
-        VALUES ('lockdown_enabled', :val) 
-        ON CONFLICT(key) DO UPDATE SET value = :val
-    ");
+    $stmt = $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('lockdown_enabled', :val)");
     return $stmt->execute([':val' => $val]);
 }
 
@@ -134,7 +132,7 @@ function update_pin(string $new_pin): bool {
     }
     $db = get_db();
     $hash = password_hash($new_pin, PASSWORD_DEFAULT);
-    $stmt = $db->prepare("INSERT INTO settings (key, value) VALUES ('pin', :pin) ON CONFLICT(key) DO UPDATE SET value = :pin");
+    $stmt = $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('pin', :pin)");
     return $stmt->execute([':pin' => $hash]);
 }
 
@@ -176,7 +174,7 @@ function validate_auth_token(?string $token): bool {
 }
 
 /**
- * Tjekker om den aktuelle anmoder er logget ind (via session, cookie eller Bearer-header)
+ * Tjekker om den aktuelle anmoder er logget ind (via session, cookie, header eller payload)
  */
 function is_authenticated(): bool {
     // 1. Session check
@@ -190,13 +188,26 @@ function is_authenticated(): bool {
         return true;
     }
 
-    // 3. Authorization Header check (til PWA API kald)
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    // 3. Authorization Header check (tjekker standard, redirect og apache getallheaders)
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    if (empty($authHeader) && function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    }
     if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
         $bearerToken = trim($matches[1]);
         if (validate_auth_token($bearerToken)) {
+            $_SESSION['logged_in'] = true;
             return true;
         }
+    }
+
+    // 4. Token parameter i JSON body, POST eller GET
+    global $input;
+    $inputToken = $input['token'] ?? $_POST['token'] ?? $_GET['token'] ?? '';
+    if (!empty($inputToken) && validate_auth_token($inputToken)) {
+        $_SESSION['logged_in'] = true;
+        return true;
     }
 
     return false;

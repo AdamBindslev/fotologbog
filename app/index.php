@@ -656,18 +656,58 @@ function switchView(viewName) {
     window.scrollTo(0, 0);
 }
 
-// Tjek om brugeren er autentificeret
-async function checkAuthStatus() {
-    const savedToken = localStorage.getItem('logbog_token');
-    const headers = {};
-    if (savedToken) {
-        headers['Authorization'] = 'Bearer ' + savedToken;
+// Robust API-kald hjælper
+async function apiFetch(action, options = {}) {
+    const token = localStorage.getItem('logbog_token') || '';
+    const method = options.method || 'GET';
+    const headers = options.headers || {};
+
+    if (token) {
+        headers['Authorization'] = 'Bearer ' + token;
     }
 
+    let url = 'api.php?action=' + encodeURIComponent(action);
+    let body = options.body;
+
+    if (method === 'POST') {
+        if (typeof body === 'object' && !(body instanceof FormData)) {
+            headers['Content-Type'] = 'application/json';
+            body = JSON.stringify({ ...body, token: token });
+        }
+    } else {
+        if (token) {
+            url += '&token=' + encodeURIComponent(token);
+        }
+    }
+
+    const res = await fetch(url, { method, headers, body });
+    const rawText = await res.text();
+    let data = null;
     try {
-        const res = await fetch('api.php?action=check_auth', { headers });
-        const data = await res.json();
-        if (data.authenticated) {
+        data = JSON.parse(rawText);
+    } catch (parseErr) {
+        console.error('Uventet serversvar:', rawText);
+        const cleanErr = rawText.replace(/<[^>]*>?/gm, '').trim();
+        throw new Error('Serverfejl (' + res.status + '): ' + (cleanErr.substring(0, 140) || 'Ugyldigt svar'));
+    }
+
+    if (!res.ok) {
+        if (res.status === 401) {
+            localStorage.removeItem('logbog_token');
+            switchView('login');
+            throw new Error(data.error || 'Session udløbet. Log ind igen.');
+        }
+        throw new Error(data.error || 'Fejl fra server (' + res.status + ')');
+    }
+
+    return data;
+}
+
+// Tjek om brugeren er autentificeret
+async function checkAuthStatus() {
+    try {
+        const data = await apiFetch('check_auth');
+        if (data && data.authenticated) {
             switchView('compose');
             setDefaultDate();
         } else {
@@ -687,24 +727,19 @@ async function handleLogin(e) {
     btn.textContent = 'Tjekker...';
 
     try {
-        const res = await fetch('api.php?action=login', {
+        const data = await apiFetch('login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pin })
+            body: { pin }
         });
-        const data = await res.json();
-
-        if (res.ok && data.success) {
+        if (data.success) {
             localStorage.setItem('logbog_token', data.token);
             showAlert('Logget ind!', 'success', 2000);
             document.getElementById('pinInput').value = '';
             switchView('compose');
             setDefaultDate();
-        } else {
-            showAlert(data.error || 'Forkert PIN-kode', 'error');
         }
     } catch (err) {
-        showAlert('Forbindelsesfejl. Prøv igen.', 'error');
+        showAlert(err.message || 'Forkert PIN-kode', 'error');
     } finally {
         btn.disabled = false;
         btn.textContent = 'Lås op';
@@ -844,34 +879,23 @@ async function handleCreatePost(e) {
         image_data: compressedImageData
     };
 
-    const token = localStorage.getItem('logbog_token');
-
     try {
-        const res = await fetch('api.php?action=create_post', {
+        const data = await apiFetch('create_post', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token
-            },
-            body: JSON.stringify(payload)
+            body: payload
         });
-        const data = await res.json();
 
-        if (res.ok && data.success) {
+        if (data.success) {
             showAlert('✓ Dit indlæg er gemt i logbogen!', 'success', 4000);
-            
-            // Nulstil formularen
             document.getElementById('postForm').reset();
             compressedImageData = null;
             document.getElementById('imagePreview').style.display = 'none';
             document.getElementById('photoPickerPrompt').style.display = 'block';
             document.getElementById('imageResInfo').style.display = 'none';
             setDefaultDate();
-        } else {
-            showAlert(data.error || 'Fejl under gemning', 'error');
         }
     } catch (err) {
-        showAlert('Netværksfejl under upload', 'error');
+        showAlert(err.message || 'Fejl under gemning', 'error');
     } finally {
         saveBtn.disabled = false;
         saveBtn.textContent = 'Gem i logbog';
@@ -883,14 +907,9 @@ async function loadPostsHistory() {
     const container = document.getElementById('postsListContainer');
     container.innerHTML = '<p style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">Henter indlæg...</p>';
 
-    const token = localStorage.getItem('logbog_token');
     try {
-        const res = await fetch('api.php?action=get_posts', {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        const data = await res.json();
-
-        if (res.ok && data.posts) {
+        const data = await apiFetch('get_posts');
+        if (data && data.posts) {
             if (data.posts.length === 0) {
                 container.innerHTML = '<p style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">Ingen indlæg oprettet endnu.</p>';
                 return;
@@ -917,7 +936,7 @@ async function loadPostsHistory() {
             container.innerHTML = html;
         }
     } catch (e) {
-        container.innerHTML = '<p style="color: var(--accent-red);">Kunne ikke hente indlæg.</p>';
+        container.innerHTML = `<p style="color: var(--accent-red);">${e.message || 'Kunne ikke hente indlæg'}</p>`;
     }
 }
 
@@ -927,45 +946,29 @@ async function deletePost(id) {
         return;
     }
 
-    const token = localStorage.getItem('logbog_token');
     try {
-        const res = await fetch('api.php?action=delete_post', {
+        const data = await apiFetch('delete_post', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token
-            },
-            body: JSON.stringify({ id })
+            body: { id }
         });
-        const data = await res.json();
-        if (res.ok && data.success) {
+        if (data.success) {
             showAlert('Indlæg slettet', 'success', 2000);
             const el = document.getElementById('hist-' + id);
             if (el) el.remove();
-        } else {
-            showAlert(data.error || 'Fejl under sletning', 'error');
         }
     } catch (e) {
-        showAlert('Netværksfejl', 'error');
+        showAlert(e.message || 'Fejl under sletning', 'error');
     }
 }
 
 // Hent sikkerhedsindstillinger (Lockdown)
 async function loadSecuritySettings() {
     const label = document.getElementById('lockdownStatusLabel');
-    const btn = document.getElementById('btnToggleLockdown');
-    const token = localStorage.getItem('logbog_token');
-
     try {
-        const res = await fetch('api.php?action=get_settings', {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        const data = await res.json();
-        if (res.ok) {
-            updateLockdownUI(data.lockdown);
-        }
+        const data = await apiFetch('get_settings');
+        updateLockdownUI(data.lockdown);
     } catch (e) {
-        label.textContent = 'Status: Kunne ikke hentes';
+        label.textContent = 'Status: ' + (e.message || 'Kunne ikke hentes');
     }
 }
 
@@ -986,22 +989,13 @@ function updateLockdownUI(isLocked) {
 async function toggleLockdown() {
     const btn = document.getElementById('btnToggleLockdown');
     btn.disabled = true;
-    const token = localStorage.getItem('logbog_token');
 
     try {
-        const res = await fetch('api.php?action=toggle_lockdown', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-            showAlert(data.message, 'success', 3500);
-            updateLockdownUI(data.lockdown);
-        } else {
-            showAlert(data.error || 'Fejl', 'error');
-        }
+        const data = await apiFetch('toggle_lockdown', { method: 'POST' });
+        showAlert(data.message, 'success', 3500);
+        updateLockdownUI(data.lockdown);
     } catch (e) {
-        showAlert('Netværksfejl', 'error');
+        showAlert(e.message || 'Fejl', 'error');
     } finally {
         btn.disabled = false;
     }
@@ -1011,33 +1005,25 @@ async function toggleLockdown() {
 async function handleUpdatePin(e) {
     e.preventDefault();
     const newPin = document.getElementById('newPinInput').value;
-    const token = localStorage.getItem('logbog_token');
 
     try {
-        const res = await fetch('api.php?action=update_pin', {
+        const data = await apiFetch('update_pin', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token
-            },
-            body: JSON.stringify({ new_pin: newPin })
+            body: { new_pin: newPin }
         });
-        const data = await res.json();
-        if (res.ok && data.success) {
+        if (data.success) {
             showAlert('✓ PIN-koden er ændret!', 'success', 3000);
             document.getElementById('newPinInput').value = '';
-        } else {
-            showAlert(data.error || 'Fejl under ændring', 'error');
         }
     } catch (e) {
-        showAlert('Netværksfejl', 'error');
+        showAlert(e.message || 'Fejl under ændring', 'error');
     }
 }
 
 // Log ud
 async function handleLogout() {
     try {
-        await fetch('api.php?action=logout');
+        await apiFetch('logout');
     } catch (e) {}
     localStorage.removeItem('logbog_token');
     switchView('login');

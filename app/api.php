@@ -269,10 +269,14 @@ if ($action === 'update_pin') {
         json_reply(['error' => 'Ny PIN-kode skal være på mindst 4 tegn'], 400);
     }
 
-    if (update_pin($newPin)) {
-        json_reply(['success' => true, 'message' => 'PIN-koden er ændret']);
-    } else {
-        json_reply(['error' => 'Kunne ikke opdatere PIN-kode'], 500);
+    try {
+        if (update_pin($newPin)) {
+            json_reply(['success' => true, 'message' => 'PIN-koden er ændret']);
+        } else {
+            json_reply(['error' => 'Kunne ikke opdatere PIN-kode'], 500);
+        }
+    } catch (Throwable $e) {
+        json_reply(['error' => 'Database fejl: ' . $e->getMessage()], 500);
     }
 }
 

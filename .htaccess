@@ -2,9 +2,17 @@
 Options -Indexes
 AddDefaultCharset UTF-8
 
+# Bevar HTTP Authorization header ved FastCGI / PHP-FPM
+<IfModule mod_setenvif.c>
+    SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1
+</IfModule>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
+
+    # Send Authorization header videre til PHP
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
     # Beskyt følsomme filer og mapper
     RewriteRule ^data/ - [F,L]
