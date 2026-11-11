@@ -75,13 +75,6 @@ $totalPages = ceil($totalPosts / POSTS_PER_PAGE);
                         <h1 class="site-title">
                             <a href="<?= BASE_URL ?>/">ADAM BINDSLEV <span class="title-slash">//</span> LOGBOG</a>
                         </h1>
-                        <div class="header-badge-strip">
-                            <span class="header-badge">NARROW RULED</span>
-                            <span class="badge-dot">•</span>
-                            <span class="header-badge">MARGINAL</span>
-                            <span class="badge-dot">•</span>
-                            <span class="header-badge">NO. 843-P</span>
-                        </div>
                     </div>
                     <nav class="site-nav">
                         <a href="<?= BASE_URL ?>/" class="<?= ($view === 'feed' && !$filterYear) ? 'active' : '' ?>">[ LOGBOG ]</a>

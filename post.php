@@ -75,11 +75,6 @@ $excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
                         <div class="site-title">
                             <a href="<?= BASE_URL ?>/">ADAM BINDSLEV <span class="title-slash">//</span> LOGBOG</a>
                         </div>
-                        <div class="header-badge-strip">
-                            <span class="header-badge">NARROW RULED</span>
-                            <span class="badge-dot">•</span>
-                            <span class="header-badge">MARGINAL</span>
-                        </div>
                     </div>
                     <nav class="site-nav">
                         <a href="<?= BASE_URL ?>/">[ ← LOGBOG ]</a>
