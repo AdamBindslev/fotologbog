@@ -70,6 +70,15 @@ function init_db_schema(PDO $db): void {
         );
     ");
 
+    // Login forsøg (til rate limiting og brute-force beskyttelse)
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS login_attempts (
+            ip TEXT PRIMARY KEY,
+            attempts INTEGER NOT NULL DEFAULT 1,
+            last_attempt INTEGER NOT NULL
+        );
+    ");
+
     // Sæt standard PIN i settings hvis den ikke findes
     $stmt = $db->prepare("SELECT value FROM settings WHERE key = 'pin'");
     $stmt->execute();

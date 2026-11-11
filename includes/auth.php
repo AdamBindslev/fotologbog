@@ -10,6 +10,98 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /**
+ * Henter klientens IP-adresse
+ */
+function get_client_ip(): string {
+    $headers = ['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'];
+    foreach ($headers as $h) {
+        if (!empty($_SERVER[$h])) {
+            $ips = explode(',', $_SERVER[$h]);
+            return trim($ips[0]);
+        }
+    }
+    return '127.0.0.1';
+}
+
+/**
+ * Tjekker om IP-adressen er blokeret pga. for mange forkerte loginforsøg (5 forsøg inden for 15 min)
+ */
+function is_ip_rate_limited(string $ip): array {
+    $db = get_db();
+    $stmt = $db->prepare("SELECT attempts, last_attempt FROM login_attempts WHERE ip = :ip");
+    $stmt->execute([':ip' => $ip]);
+    $row = $stmt->fetch();
+
+    if ($row) {
+        $lockoutSeconds = 900; // 15 minutter
+        $timeSinceLast = time() - (int)$row['last_attempt'];
+        if ((int)$row['attempts'] >= 5) {
+            if ($timeSinceLast < $lockoutSeconds) {
+                $waitMinutes = ceil(($lockoutSeconds - $timeSinceLast) / 60);
+                return ['blocked' => true, 'wait_minutes' => $waitMinutes];
+            } else {
+                // Tiden er udløbet, nulstil
+                clear_failed_logins($ip);
+            }
+        }
+    }
+    return ['blocked' => false, 'wait_minutes' => 0];
+}
+
+/**
+ * Registrerer et mislykket loginforsøg
+ */
+function record_failed_login(string $ip): int {
+    $db = get_db();
+    $stmt = $db->prepare("
+        INSERT INTO login_attempts (ip, attempts, last_attempt) 
+        VALUES (:ip, 1, :now)
+        ON CONFLICT(ip) DO UPDATE SET 
+            attempts = attempts + 1,
+            last_attempt = :now
+    ");
+    $stmt->execute([':ip' => $ip, ':now' => time()]);
+
+    $stmtCheck = $db->prepare("SELECT attempts FROM login_attempts WHERE ip = :ip");
+    $stmtCheck->execute([':ip' => $ip]);
+    return (int)$stmtCheck->fetchColumn();
+}
+
+/**
+ * Nulstiller fejlforsøg ved vellykket login
+ */
+function clear_failed_logins(string $ip): void {
+    $db = get_db();
+    $stmt = $db->prepare("DELETE FROM login_attempts WHERE ip = :ip");
+    $stmt->execute([':ip' => $ip]);
+}
+
+/**
+ * Tjekker om "Lockdown Mode" er slået til (blokerer alle nye logins)
+ */
+function is_lockdown_enabled(): bool {
+    $db = get_db();
+    $stmt = $db->prepare("SELECT value FROM settings WHERE key = 'lockdown_enabled'");
+    $stmt->execute();
+    $row = $stmt->fetch();
+    return $row && ($row['value'] === '1' || $row['value'] === 'true');
+}
+
+/**
+ * Slår "Lockdown Mode" til eller fra
+ */
+function set_lockdown(bool $enabled): bool {
+    $db = get_db();
+    $val = $enabled ? '1' : '0';
+    $stmt = $db->prepare("
+        INSERT INTO settings (key, value) 
+        VALUES ('lockdown_enabled', :val) 
+        ON CONFLICT(key) DO UPDATE SET value = :val
+    ");
+    return $stmt->execute([':val' => $val]);
+}
+
+/**
  * Validerer en indtastet PIN-kode
  */
 function verify_pin(string $input_pin): bool {

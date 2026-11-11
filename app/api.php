@@ -35,12 +35,28 @@ function json_reply(array $data, int $code = 200): void {
 
 // 1. Login med PIN-kode
 if ($action === 'login') {
+    $clientIp = get_client_ip();
+
+    // Tjek om Lockdown er slået til (blokerer alle nye logins)
+    if (is_lockdown_enabled()) {
+        json_reply(['error' => '🔒 Logins er låst for nye enheder af administratoren (Lockdown aktiv).'], 403);
+    }
+
+    // Tjek for brute-force rate-limiting
+    $rateLimit = is_ip_rate_limited($clientIp);
+    if ($rateLimit['blocked']) {
+        json_reply(['error' => 'For mange forkerte forsøg. IP-adressen er midlertidigt blokeret i ' . $rateLimit['wait_minutes'] . ' minutter.'], 429);
+    }
+
     $pin = trim((string)($input['pin'] ?? ''));
     if (empty($pin)) {
         json_reply(['error' => 'PIN-kode mangler'], 400);
     }
 
     if (verify_pin($pin)) {
+        // Nulstil fejlforsøg
+        clear_failed_logins($clientIp);
+
         $token = generate_auth_token();
         $_SESSION['logged_in'] = true;
         
@@ -62,7 +78,15 @@ if ($action === 'login') {
             'message' => 'Login godkendt'
         ]);
     } else {
-        json_reply(['error' => 'Forkert PIN-kode'], 401);
+        $attempts = record_failed_login($clientIp);
+        $remaining = max(0, 5 - $attempts);
+        $errMsg = 'Forkert PIN-kode';
+        if ($remaining > 0) {
+            $errMsg .= " ($remaining forsøg tilbage før midlertidig blokering)";
+        } else {
+            $errMsg .= " (Blokeret i 15 minutter)";
+        }
+        json_reply(['error' => $errMsg], 401);
     }
 }
 
@@ -264,7 +288,26 @@ if ($action === 'backup') {
     exit;
 }
 
-// 10. Log ud
+// 10. Hent sikkerhedsindstillinger
+if ($action === 'get_settings') {
+    json_reply([
+        'lockdown' => is_lockdown_enabled()
+    ]);
+}
+
+// 11. Slå Lockdown til/fra
+if ($action === 'toggle_lockdown') {
+    $current = is_lockdown_enabled();
+    $newStatus = !$current;
+    set_lockdown($newStatus);
+    json_reply([
+        'success' => true,
+        'lockdown' => $newStatus,
+        'message' => $newStatus ? '🔒 Lockdown aktiveret: Alle nye logins er nu blokeret!' : '🔓 Lockdown deaktiveret: Nye logins er tilladt.'
+    ]);
+}
+
+// 12. Log ud
 if ($action === 'logout') {
     $_SESSION = [];
     if (session_id()) {

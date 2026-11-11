@@ -56,7 +56,6 @@ $totalPages = ceil($totalPosts / POSTS_PER_PAGE);
             <a href="<?= BASE_URL ?>/" class="<?= ($view === 'feed' && !$filterYear) ? 'active' : '' ?>">Logbog</a>
             <a href="<?= BASE_URL ?>/?view=archive" class="<?= ($view === 'archive') ? 'active' : '' ?>">Arkiv</a>
             <a href="<?= BASE_URL ?>/rss.php" target="_blank">RSS</a>
-            <a href="<?= BASE_URL ?>/app/" class="admin-link" title="Gå til mobil app / skriv nyt">[ Skriv ]</a>
         </nav>
     </header>
 

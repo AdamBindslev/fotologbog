@@ -24,6 +24,18 @@ En minimalistisk, hurtig og personlig fotologbog med notesbogs-æstetik. Bygget 
 
 ---
 
+## 🔒 Sikkerhed & Flerlagsbeskyttelse
+
+For at sikre at ingen andre kan få adgang til at poste i din logbog:
+1. **Skjult indgang:** Der er ingen offentlige links til upload-/skrivefladen på forsiden. Kun du kender adressen (`/app/` eller `/skriv`).
+2. **Brute-force spærring (Rate Limiting):** Tastes der forkert PIN-kode 5 gange i træk, spærres den pågældende IP-adresse automatisk i 15 minutter.
+3. **Lockdown Mode (Luk for nye logins):**
+   * Når du har logget ind på dine foretrukne enheder (telefon, iPad og computer), går du ind i appen under **⚙️ Indstillinger** og trykker **"🔒 Lås for nye logins"**.
+   * Serveren vil derefter **afvise 100% af alle nye login-forsøg**, uanset om de gætter din PIN-kode.
+   * Dine allerede godkendte enheder fortsætter med at virke i 1 år uden afbrydelse.
+
+---
+
 ## 🚀 Opsætning på Gigahost.dk
 
 ### 1. Upload filerne

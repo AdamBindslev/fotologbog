@@ -47,7 +47,6 @@ $excerpt = mb_substr(strip_tags($post['content'] ?? ''), 0, 160, 'UTF-8');
         <nav class="site-nav">
             <a href="<?= BASE_URL ?>/">← Tilbage til logbog</a>
             <a href="<?= BASE_URL ?>/?view=archive">Arkiv</a>
-            <a href="<?= BASE_URL ?>/app/" class="admin-link">[ Skriv ]</a>
         </nav>
     </header>
 

@@ -538,6 +538,22 @@ require_once __DIR__ . '/../includes/auth.php';
 
     <!-- 4. INDSTILLINGER & BACKUP -->
     <div id="viewSettings" class="view-section">
+        <!-- Lockdown mode -->
+        <div class="settings-card" style="border-left: 4px solid var(--accent);">
+            <h3 class="settings-title">[ 🔒 LUK FOR NYE LOGINS (LOCKDOWN) ]</h3>
+            <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px;">
+                Når dine enheder (telefon, iPad, computer) er logget ind, kan du aktivere denne funktion. Det <strong>blokerer alle nye login-forsøg 100%</strong> – selv hvis nogen gætter din PIN-kode.
+            </p>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px;">
+                <span id="lockdownStatusLabel" style="font-family: var(--font-mono); font-size: 13px; font-weight: 700;">
+                    Status: Tjekker...
+                </span>
+                <button type="button" id="btnToggleLockdown" onclick="toggleLockdown()" class="btn-small" style="padding: 10px 16px; font-weight: 600;">
+                    Skift status
+                </button>
+            </div>
+        </div>
+
         <div class="settings-card">
             <h3 class="settings-title">[ DATABASE BACKUP ]</h3>
             <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 14px;">
@@ -635,6 +651,7 @@ function switchView(viewName) {
         document.getElementById('viewSettings').classList.add('active');
         document.getElementById('bottomNav').style.display = 'flex';
         document.querySelectorAll('.tab-btn')[2].classList.add('active');
+        loadSecuritySettings();
     }
     window.scrollTo(0, 0);
 }
@@ -930,6 +947,63 @@ async function deletePost(id) {
         }
     } catch (e) {
         showAlert('Netværksfejl', 'error');
+    }
+}
+
+// Hent sikkerhedsindstillinger (Lockdown)
+async function loadSecuritySettings() {
+    const label = document.getElementById('lockdownStatusLabel');
+    const btn = document.getElementById('btnToggleLockdown');
+    const token = localStorage.getItem('logbog_token');
+
+    try {
+        const res = await fetch('api.php?action=get_settings', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (res.ok) {
+            updateLockdownUI(data.lockdown);
+        }
+    } catch (e) {
+        label.textContent = 'Status: Kunne ikke hentes';
+    }
+}
+
+function updateLockdownUI(isLocked) {
+    const label = document.getElementById('lockdownStatusLabel');
+    const btn = document.getElementById('btnToggleLockdown');
+    if (isLocked) {
+        label.innerHTML = 'Status: <span style="color: #b93826;">🔒 AKTIV (Nye logins er blokeret)</span>';
+        btn.textContent = '🔓 Åbn for nye logins';
+        btn.className = 'btn-small';
+    } else {
+        label.innerHTML = 'Status: <span style="color: #166534;">🔓 ÅBEN (Nye logins tilladt)</span>';
+        btn.textContent = '🔒 Lås for nye logins';
+        btn.className = 'btn-small btn-danger';
+    }
+}
+
+async function toggleLockdown() {
+    const btn = document.getElementById('btnToggleLockdown');
+    btn.disabled = true;
+    const token = localStorage.getItem('logbog_token');
+
+    try {
+        const res = await fetch('api.php?action=toggle_lockdown', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            showAlert(data.message, 'success', 3500);
+            updateLockdownUI(data.lockdown);
+        } else {
+            showAlert(data.error || 'Fejl', 'error');
+        }
+    } catch (e) {
+        showAlert('Netværksfejl', 'error');
+    } finally {
+        btn.disabled = false;
     }
 }
 
