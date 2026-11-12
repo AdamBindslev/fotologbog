@@ -180,7 +180,6 @@ if ($action === 'create_post') {
     $exifAperture = trim((string)($input['exif_aperture'] ?? ''));
     $exifShutter = trim((string)($input['exif_shutter'] ?? ''));
     $exifIso = trim((string)($input['exif_iso'] ?? ''));
-    $exifFilmSim = trim((string)($input['exif_film_sim'] ?? ''));
 
     if (empty($exifCamera) && empty($exifLens) && empty($exifFocal) && empty($exifAperture) && empty($exifShutter) && empty($exifIso)) {
         $extractedExif = extract_exif_from_image_file(UPLOADS_DIR . '/' . $imagePath);
@@ -214,11 +213,11 @@ if ($action === 'create_post') {
     $stmt = $db->prepare("
         INSERT INTO posts (
             uid, title, slug, content, image_path, location, latitude, longitude, published_at, status,
-            og_style, exif_camera, exif_lens, exif_focal, exif_aperture, exif_shutter, exif_iso, exif_film_sim, created_at, updated_at
+            og_style, exif_camera, exif_lens, exif_focal, exif_aperture, exif_shutter, exif_iso, created_at, updated_at
         )
         VALUES (
             :uid, :title, :slug, :content, :image_path, :location, :latitude, :longitude, :published_at, :status,
-            :og_style, :exif_camera, :exif_lens, :exif_focal, :exif_aperture, :exif_shutter, :exif_iso, :exif_film_sim, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            :og_style, :exif_camera, :exif_lens, :exif_focal, :exif_aperture, :exif_shutter, :exif_iso, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
     ");
 
@@ -239,8 +238,7 @@ if ($action === 'create_post') {
         ':exif_focal' => $exifFocal ?: null,
         ':exif_aperture' => $exifAperture ?: null,
         ':exif_shutter' => $exifShutter ?: null,
-        ':exif_iso' => $exifIso ?: null,
-        ':exif_film_sim' => $exifFilmSim ?: null
+        ':exif_iso' => $exifIso ?: null
     ]);
 
     if ($success) {
@@ -459,8 +457,7 @@ if ($action === 'update_post') {
         isset($input['exif_focal']) ||
         isset($input['exif_aperture']) ||
         isset($input['exif_shutter']) ||
-        isset($input['exif_iso']) ||
-        isset($input['exif_film_sim'])
+        isset($input['exif_iso'])
     ) {
         $exifCamera = trim((string)($input['exif_camera'] ?? ($post['exif_camera'] ?? '')));
         $exifLens = trim((string)($input['exif_lens'] ?? ($post['exif_lens'] ?? '')));
@@ -468,10 +465,9 @@ if ($action === 'update_post') {
         $exifAperture = trim((string)($input['exif_aperture'] ?? ($post['exif_aperture'] ?? '')));
         $exifShutter = trim((string)($input['exif_shutter'] ?? ($post['exif_shutter'] ?? '')));
         $exifIso = trim((string)($input['exif_iso'] ?? ($post['exif_iso'] ?? '')));
-        $exifFilmSim = trim((string)($input['exif_film_sim'] ?? ($post['exif_film_sim'] ?? '')));
         $stmtExif = $db->prepare("
             UPDATE posts 
-            SET exif_camera = :cam, exif_lens = :lens, exif_focal = :foc, exif_aperture = :ap, exif_shutter = :sh, exif_iso = :iso, exif_film_sim = :fsim 
+            SET exif_camera = :cam, exif_lens = :lens, exif_focal = :foc, exif_aperture = :ap, exif_shutter = :sh, exif_iso = :iso 
             WHERE id = :id
         ");
         $stmtExif->execute([
@@ -481,7 +477,6 @@ if ($action === 'update_post') {
             ':ap' => $exifAperture ?: null,
             ':sh' => $exifShutter ?: null,
             ':iso' => $exifIso ?: null,
-            ':fsim' => $exifFilmSim ?: null,
             ':id' => $id
         ]);
     }

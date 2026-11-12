@@ -1018,7 +1018,7 @@ function count_posts_by_location(string $location): int {
 }
 
 /**
- * Formaterer en læsevenlig retro EXIF-streng: f.eks. "FUJIFILM X-Pro3 · XF 35mm f/1.4 · ƒ/2.8 · 1/250s · ISO 400 · Classic Chrome"
+ * Formaterer en læsevenlig retro EXIF-streng: f.eks. "FUJIFILM X-Pro3 · XF 35mm f/1.4 · ƒ/2.8 · 1/250s · ISO 400"
  */
 function format_exif(array $post): ?string {
     $parts = [];
@@ -1039,9 +1039,6 @@ function format_exif(array $post): ?string {
     }
     if (!empty($post['exif_iso'])) {
         $parts[] = trim((string)$post['exif_iso']);
-    }
-    if (!empty($post['exif_film_sim'])) {
-        $parts[] = trim((string)$post['exif_film_sim']);
     }
 
     if (empty($parts)) {

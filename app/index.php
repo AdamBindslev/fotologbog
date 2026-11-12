@@ -674,7 +674,7 @@ require_once __DIR__ . '/../includes/auth.php';
                 <div id="imageResInfo" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 4px; display: none;"></div>
             </div>
 
-            <!-- Kameradata (EXIF) inkl. Kamera, Optik, Filmsimulering og Brændvidde -->
+            <!-- Kameradata (EXIF) inkl. Kamera, Optik og Brændvidde -->
             <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
                     <label class="form-label" style="margin-bottom: 0;">Kameradata &amp; Optik (EXIF)</label>
@@ -686,19 +686,11 @@ require_once __DIR__ . '/../includes/auth.php';
                     <input type="text" id="exifCameraInput" class="form-control" placeholder="Kamera (f.eks. FUJIFILM X-Pro3)" title="Kamera">
                     <input type="text" id="exifLensInput" class="form-control" placeholder="Objektiv (f.eks. XF 35mm f/1.4)" title="Objektiv">
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;">
                     <input type="text" id="exifFocalInput" class="form-control" placeholder="35mm" title="Brændvidde">
                     <input type="text" id="exifApertureInput" class="form-control" placeholder="ƒ/2.8" title="Blænde">
                     <input type="text" id="exifShutterInput" class="form-control" placeholder="1/250s" title="Lukkertid">
                     <input type="text" id="exifIsoInput" class="form-control" placeholder="ISO 400" title="ISO">
-                </div>
-                <input type="text" id="exifFilmSimInput" class="form-control" placeholder="Filmsimulering / Film (f.eks. Classic Chrome, Acros)" title="Fuji filmsimulering eller filmtype">
-                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
-                    <button type="button" class="btn-small" style="font-size: 11px; padding: 3px 8px;" onclick="setFilmSim('Classic Chrome')">Classic Chrome</button>
-                    <button type="button" class="btn-small" style="font-size: 11px; padding: 3px 8px;" onclick="setFilmSim('Acros')">Acros</button>
-                    <button type="button" class="btn-small" style="font-size: 11px; padding: 3px 8px;" onclick="setFilmSim('Nostalgic Neg')">Nostalgic Neg</button>
-                    <button type="button" class="btn-small" style="font-size: 11px; padding: 3px 8px;" onclick="setFilmSim('Classic Neg')">Classic Neg</button>
-                    <button type="button" class="btn-small" style="font-size: 11px; padding: 3px 8px;" onclick="setFilmSim('Provia')">Provia</button>
                 </div>
             </div>
 
@@ -1015,13 +1007,12 @@ require_once __DIR__ . '/../includes/auth.php';
                     <input type="text" id="editExifCamera" class="form-control" placeholder="Kamera" title="Kamera">
                     <input type="text" id="editExifLens" class="form-control" placeholder="Objektiv" title="Objektiv">
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;">
                     <input type="text" id="editExifFocal" class="form-control" placeholder="35mm" title="Brændvidde">
                     <input type="text" id="editExifAperture" class="form-control" placeholder="ƒ/2.8" title="Blænde">
                     <input type="text" id="editExifShutter" class="form-control" placeholder="1/250s" title="Lukkertid">
                     <input type="text" id="editExifIso" class="form-control" placeholder="ISO 400" title="ISO">
                 </div>
-                <input type="text" id="editExifFilmSim" class="form-control" placeholder="Filmsimulering / Film" title="Filmsimulering">
             </div>
             <div class="form-group">
                 <label class="form-label" for="editStatusSelect">Status</label>
@@ -1933,11 +1924,6 @@ function readExifDateString(view, offset, maxLen) {
     return null;
 }
 
-function setFilmSim(name) {
-    const el = document.getElementById('exifFilmSimInput');
-    if (el) el.value = name;
-}
-
 // Smart hybrid billedhåndtering:
 // Behold originalen direkte (100% Fuji-farver/skarphed), hvis den er <= 2400px og < 4 MB i JPEG/PNG/WebP.
 // Ellers skaler skånsomt til 2400px @ 92% JPEG.
@@ -2426,8 +2412,7 @@ async function submitPostWithStatus(status = 'published') {
         exif_focal: (document.getElementById('exifFocalInput')?.value || '').trim(),
         exif_aperture: (document.getElementById('exifApertureInput')?.value || '').trim(),
         exif_shutter: (document.getElementById('exifShutterInput')?.value || '').trim(),
-        exif_iso: (document.getElementById('exifIsoInput')?.value || '').trim(),
-        exif_film_sim: (document.getElementById('exifFilmSimInput')?.value || '').trim()
+        exif_iso: (document.getElementById('exifIsoInput')?.value || '').trim()
     };
 
     try {
@@ -2452,7 +2437,6 @@ async function submitPostWithStatus(status = 'published') {
             document.getElementById('exifApertureInput').value = '';
             document.getElementById('exifShutterInput').value = '';
             document.getElementById('exifIsoInput').value = '';
-            if (document.getElementById('exifFilmSimInput')) document.getElementById('exifFilmSimInput').value = '';
             const exifBadge = document.getElementById('exifStatusBadge');
             if (exifBadge) {
                 exifBadge.textContent = 'Udlæses automatisk fra foto';
@@ -2663,7 +2647,6 @@ async function openEditModal(id) {
         document.getElementById('editExifAperture').value = p.exif_aperture || '';
         document.getElementById('editExifShutter').value = p.exif_shutter || '';
         document.getElementById('editExifIso').value = p.exif_iso || '';
-        if (document.getElementById('editExifFilmSim')) document.getElementById('editExifFilmSim').value = p.exif_film_sim || '';
         if (document.getElementById('editStatusSelect')) document.getElementById('editStatusSelect').value = p.status || 'published';
 
         setEditOgStyle(p.og_style || 'notebook');
@@ -2700,8 +2683,7 @@ async function handleSaveEdit(e) {
         exif_focal: document.getElementById('editExifFocal').value,
         exif_aperture: document.getElementById('editExifAperture').value,
         exif_shutter: document.getElementById('editExifShutter').value,
-        exif_iso: document.getElementById('editExifIso').value,
-        exif_film_sim: document.getElementById('editExifFilmSim') ? document.getElementById('editExifFilmSim').value : ''
+        exif_iso: document.getElementById('editExifIso').value
     };
 
     if (editCompressedImageData) {
