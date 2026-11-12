@@ -109,8 +109,8 @@ function render_contact_sheet_grid(array $sheet, array $monthNames, bool $linkTo
                     $eUid = !empty($entry['uid']) ? $entry['uid'] : (string)$entry['id'];
                     $href = $linkToAnchor 
                         ? ('#entry-' . htmlspecialchars($eUid))
-                        : (htmlspecialchars(BASE_URL) . '/post.php?p=' . urlencode((string)$eUid));
-                    $thumbUrl = UPLOADS_URL . '/' . htmlspecialchars($entry['image_path']);
+                        : htmlspecialchars(get_post_url($entry));
+                    $thumbUrl = get_thumbnail_url($entry['image_path']);
                 ?>
                     <a href="<?= $href ?>" class="contact-cell contact-cell-filled" title="<?= htmlspecialchars($dInfo['date_label'] . ' – ' . $entry['title']) ?>">
                         <img src="<?= $thumbUrl ?>" alt="<?= htmlspecialchars($entry['title']) ?>" loading="lazy" class="contact-thumb">
@@ -163,11 +163,6 @@ $ogTitle = !empty($activeFilterTitle) ? ($activeFilterTitle . ' – ' . SITE_TIT
     <meta name="twitter:description" content="<?= htmlspecialchars(SITE_DESCRIPTION) ?>">
     <meta name="twitter:image" content="<?= htmlspecialchars($socialImg['url']) ?>">
     <?php endif; ?>
-
-    <!-- Fonts: Bebas Neue (Vintage Display) + Fraunces (Retro Serif) + Courier Prime (Typewriter) + JetBrains Mono -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
     <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars(BASE_URL) ?>/assets/icons/favicon.svg">
     <link rel="apple-touch-icon" href="<?= htmlspecialchars(BASE_URL) ?>/assets/icons/icon-192.png">

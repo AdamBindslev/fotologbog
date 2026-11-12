@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
 
 $param = $_GET['p'] ?? $_GET['id'] ?? null;
@@ -10,18 +11,20 @@ if (!$param) {
 
 $post = get_post_by_identifier((string)$param);
 
-if (!$post) {
+if (!$post || (($post['status'] ?? 'published') !== 'published' && !is_authenticated())) {
     http_response_code(404);
     die('Indlægget blev ikke fundet. <a href="' . htmlspecialchars(BASE_URL) . '/">Gå til forsiden</a>');
 }
 
+$isDraftPreview = (($post['status'] ?? 'published') !== 'published');
 $uid = !empty($post['uid']) ? $post['uid'] : (string)$post['id'];
-$postUrl = BASE_URL . '/post.php?p=' . htmlspecialchars($uid);
+$postUrl = get_post_url($post);
 $postTags = get_post_tags((int)$post['id']);
 $exifStr = format_exif($post);
 $headerStamp = format_analog_header($post['published_at'], $post['location'] ?? null);
 $pageTitle = htmlspecialchars($post['title']) . ' – ' . htmlspecialchars(SITE_TITLE);
-$imageUrl = !empty($post['image_path']) ? UPLOADS_URL . '/' . htmlspecialchars($post['image_path']) : '';
+$postImages = get_post_images((int)$post['id'], $post['image_path'] ?? null);
+$imageUrl = !empty($postImages[0]) ? UPLOADS_URL . '/' . htmlspecialchars($postImages[0]) : '';
 $socialImg = get_post_og_meta($post) ?? get_social_image_meta($post['image_path'] ?? null);
 $fallbackDesc = trim($headerStamp . ($exifStr ? ' · ' . $exifStr : ''));
 $excerpt = get_clean_excerpt($post['content'] ?? '', $fallbackDesc, 160);
@@ -58,11 +61,6 @@ $nextPost = $adjacent['next'];
     <meta name="twitter:description" content="<?= htmlspecialchars($excerpt) ?>">
     <meta name="twitter:image" content="<?= htmlspecialchars($socialImg['url']) ?>">
     <?php endif; ?>
-
-    <!-- Fonts: Bebas Neue (Vintage Display) + Fraunces (Retro Serif) + Courier Prime (Typewriter) + JetBrains Mono -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
     <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars(BASE_URL) ?>/assets/icons/favicon.svg">
     <link rel="apple-touch-icon" href="<?= htmlspecialchars(BASE_URL) ?>/assets/icons/icon-192.png">
@@ -106,6 +104,9 @@ $nextPost = $adjacent['next'];
             </header>
 
             <main>
+                <?php if ($isDraftPreview): ?>
+                    <div class="draft-preview-banner">[ KLADDE – KUN SYNLIG FOR DIG ]</div>
+                <?php endif; ?>
                 <article class="log-entry log-entry-single">
                     <div class="entry-form-header">
                         <div class="form-field form-date">
@@ -132,8 +133,9 @@ $nextPost = $adjacent['next'];
                         <?= htmlspecialchars($post['title']) ?>
                     </h1>
 
-                    <?php if (!empty($post['image_path'])): 
+                    <?php if (!empty($postImages)): 
                         $tapeVariant = get_tape_variant($uid);
+                        $imgCount = count($postImages);
                     ?>
                         <div class="entry-photo-wrap tape-style-<?= $tapeVariant ?>">
                             <?php if ($tapeVariant === 1): ?>
@@ -149,16 +151,37 @@ $nextPost = $adjacent['next'];
                                 <span class="photo-tape tape-top-left-straight" aria-hidden="true"></span>
                                 <span class="photo-tape tape-top-right-straight" aria-hidden="true"></span>
                             <?php endif; ?>
-                            <img 
-                                src="<?= $imageUrl ?>" 
-                                alt="<?= htmlspecialchars($post['title']) ?>" 
-                                class="entry-photo loupe-clickable"
-                                data-src="<?= $imageUrl ?>"
-                                data-title="<?= htmlspecialchars($post['title']) ?>"
-                                data-stamp="<?= htmlspecialchars($headerStamp) ?>"
-                                data-exif="<?= htmlspecialchars($exifStr ?? '') ?>"
-                                title="Klik for at åbne i lup (Fuld skærm)"
-                            >
+                            <?php if ($imgCount === 1): ?>
+                                <img 
+                                    src="<?= $imageUrl ?>" 
+                                    alt="<?= htmlspecialchars($post['title']) ?>" 
+                                    class="entry-photo loupe-clickable"
+                                    data-src="<?= $imageUrl ?>"
+                                    data-title="<?= htmlspecialchars($post['title']) ?>"
+                                    data-stamp="<?= htmlspecialchars($headerStamp) ?>"
+                                    data-exif="<?= htmlspecialchars($exifStr ?? '') ?>"
+                                    title="Klik for at åbne i lup (Fuld skærm)"
+                                >
+                            <?php else: ?>
+                                <div class="entry-photo-grid count-<?= $imgCount ?>">
+                                    <?php foreach ($postImages as $idx => $pImg):
+                                        $pImgUrl = UPLOADS_URL . '/' . htmlspecialchars($pImg);
+                                    ?>
+                                        <div class="entry-photo-grid-item">
+                                            <img 
+                                                src="<?= $pImgUrl ?>" 
+                                                alt="<?= htmlspecialchars($post['title']) ?> (<?= $idx + 1 ?>/<?= $imgCount ?>)" 
+                                                class="entry-photo loupe-clickable"
+                                                data-src="<?= $pImgUrl ?>"
+                                                data-title="<?= htmlspecialchars($post['title']) ?> (<?= $idx + 1 ?>/<?= $imgCount ?>)"
+                                                data-stamp="<?= htmlspecialchars($headerStamp) ?>"
+                                                data-exif="<?= htmlspecialchars($exifStr ?? '') ?>"
+                                                title="Klik for at åbne i lup (Fuld skærm)"
+                                            >
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
                             <div class="entry-photo-caption-bar">
                                 <?php if (!empty($exifStr)): ?>
                                     <div class="entry-photo-exif" title="Kameradata (EXIF)">
@@ -203,6 +226,10 @@ $nextPost = $adjacent['next'];
                                     <span class="meta-theme">COMBINATION THEME AND NOTE BOOK</span>
                                 <?php endif; ?>
                             </div>
+                            <div class="entry-share-actions">
+                                <button type="button" class="share-btn" id="copyPostLinkBtn" data-url="<?= htmlspecialchars($postUrl) ?>">[ KOPIÉR LINK ]</button>
+                                <button type="button" class="share-btn" id="nativeShareBtn" data-url="<?= htmlspecialchars($postUrl) ?>" data-title="<?= htmlspecialchars($post['title']) ?>" style="display:none;">[ DEL ]</button>
+                            </div>
                             <div class="entry-stamp-badge">
                                 <span class="stamp-icon">REF</span>
                                 <span class="stamp-code"><?= htmlspecialchars($uid) ?></span>
@@ -214,10 +241,8 @@ $nextPost = $adjacent['next'];
                 <!-- Bladring mellem dage i logbogen -->
                 <nav class="single-post-nav" aria-label="Bladr i logbogen">
                     <div class="post-nav-slot post-nav-prev">
-                        <?php if ($prevPost): 
-                            $prevUid = !empty($prevPost['uid']) ? $prevPost['uid'] : $prevPost['id'];
-                        ?>
-                            <a href="<?= htmlspecialchars(BASE_URL) ?>/post.php?p=<?= urlencode((string)$prevUid) ?>" id="prevPostLink" class="post-nav-card" title="<?= htmlspecialchars($prevPost['title']) ?>">
+                        <?php if ($prevPost): ?>
+                            <a href="<?= htmlspecialchars(get_post_url($prevPost)) ?>" id="prevPostLink" class="post-nav-card" title="<?= htmlspecialchars($prevPost['title']) ?>">
                                 <span class="post-nav-dir">← [ FORRIGE OPTEGNELSE ]</span>
                                 <span class="post-nav-meta"><?= format_analog_date($prevPost['published_at']) ?> · <?= htmlspecialchars($prevPost['title']) ?></span>
                             </a>
@@ -227,10 +252,8 @@ $nextPost = $adjacent['next'];
                         <a href="<?= htmlspecialchars(BASE_URL) ?>/" class="back-link">[ OVERSIGT ]</a>
                     </div>
                     <div class="post-nav-slot post-nav-next">
-                        <?php if ($nextPost): 
-                            $nextUid = !empty($nextPost['uid']) ? $nextPost['uid'] : $nextPost['id'];
-                        ?>
-                            <a href="<?= htmlspecialchars(BASE_URL) ?>/post.php?p=<?= urlencode((string)$nextUid) ?>" id="nextPostLink" class="post-nav-card" title="<?= htmlspecialchars($nextPost['title']) ?>">
+                        <?php if ($nextPost): ?>
+                            <a href="<?= htmlspecialchars(get_post_url($nextPost)) ?>" id="nextPostLink" class="post-nav-card" title="<?= htmlspecialchars($nextPost['title']) ?>">
                                 <span class="post-nav-dir">[ NÆSTE OPTEGNELSE ] →</span>
                                 <span class="post-nav-meta"><?= format_analog_date($nextPost['published_at']) ?> · <?= htmlspecialchars($nextPost['title']) ?></span>
                             </a>
@@ -346,6 +369,37 @@ if (document.readyState === 'complete') {
             if (next) window.location.href = next.href;
         }
     });
+
+    // Diskret link-kopiering & native deling
+    const copyBtn = document.getElementById('copyPostLinkBtn');
+    const shareBtn = document.getElementById('nativeShareBtn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', async () => {
+            const url = copyBtn.getAttribute('data-url');
+            try {
+                await navigator.clipboard.writeText(url);
+                copyBtn.textContent = '[ KOPIERET ✓ ]';
+                copyBtn.classList.add('copied');
+                setTimeout(() => {
+                    copyBtn.textContent = '[ KOPIÉR LINK ]';
+                    copyBtn.classList.remove('copied');
+                }, 2200);
+            } catch (_) {
+                window.prompt('Kopiér link:', url);
+            }
+        });
+    }
+    if (shareBtn && navigator.share) {
+        shareBtn.style.display = 'inline-block';
+        shareBtn.addEventListener('click', async () => {
+            try {
+                await navigator.share({
+                    title: shareBtn.getAttribute('data-title') || document.title,
+                    url: shareBtn.getAttribute('data-url')
+                });
+            } catch (_) {}
+        });
+    }
 })();
 </script>
 

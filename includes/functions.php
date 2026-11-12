@@ -194,12 +194,25 @@ function normalize_datetime_input(?string $inputStr): string {
 }
 
 /**
- * Henter seneste indlæg med paginering (altid nyeste øverst)
+ * Returnerer den pæne, kanoniske permalink-URL for et indlæg (/post/<uid>)
+ */
+function get_post_url(array|string $postOrUid): string {
+    if (is_array($postOrUid)) {
+        $uid = !empty($postOrUid['uid']) ? (string)$postOrUid['uid'] : (string)($postOrUid['id'] ?? '');
+    } else {
+        $uid = (string)$postOrUid;
+    }
+    return rtrim(BASE_URL, '/') . '/post/' . rawurlencode($uid);
+}
+
+/**
+ * Henter seneste publicerede indlæg med paginering (altid nyeste øverst)
  */
 function get_recent_posts(int $limit = 10, int $offset = 0): array {
     $db = get_db();
     $stmt = $db->prepare("
         SELECT * FROM posts 
+        WHERE COALESCE(status, 'published') = 'published'
         ORDER BY datetime(published_at) DESC, published_at DESC, id DESC 
         LIMIT :limit OFFSET :offset
     ");
@@ -216,7 +229,15 @@ function search_admin_posts(string $query = '', int $limit = 50, int $offset = 0
     $db = get_db();
     $query = trim($query);
     if ($query === '') {
-        return get_recent_posts($limit, $offset);
+        $stmt = $db->prepare("
+            SELECT * FROM posts 
+            ORDER BY datetime(published_at) DESC, published_at DESC, id DESC 
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
     }
     $like = '%' . $query . '%';
     $stmt = $db->prepare("
@@ -246,7 +267,8 @@ function count_admin_posts(string $query = ''): int {
     $db = get_db();
     $query = trim($query);
     if ($query === '') {
-        return count_total_posts();
+        $stmt = $db->query("SELECT COUNT(*) FROM posts");
+        return (int)$stmt->fetchColumn();
     }
     $like = '%' . $query . '%';
     $stmt = $db->prepare("
@@ -265,11 +287,11 @@ function count_admin_posts(string $query = ''): int {
 }
 
 /**
- * Tæller det samlede antal indlæg
+ * Tæller det samlede antal publicerede indlæg
  */
 function count_total_posts(): int {
     $db = get_db();
-    $stmt = $db->query("SELECT COUNT(*) FROM posts");
+    $stmt = $db->query("SELECT COUNT(*) FROM posts WHERE COALESCE(status, 'published') = 'published'");
     return (int)$stmt->fetchColumn();
 }
 
@@ -323,22 +345,24 @@ function get_adjacent_posts(array $post): array {
     $pub = $post['published_at'];
     $id = (int)$post['id'];
 
-    // Forrige (ældre) indlæg i tidslinjen
+    // Forrige (ældre) publicerede indlæg i tidslinjen
     $stmtPrev = $db->prepare("
         SELECT id, uid, title, published_at FROM posts
-        WHERE (datetime(published_at) < datetime(:pub))
-           OR (datetime(published_at) = datetime(:pub) AND id < :id)
+        WHERE COALESCE(status, 'published') = 'published'
+          AND ((datetime(published_at) < datetime(:pub))
+           OR (datetime(published_at) = datetime(:pub) AND id < :id))
         ORDER BY datetime(published_at) DESC, id DESC
         LIMIT 1
     ");
     $stmtPrev->execute([':pub' => $pub, ':id' => $id]);
     $prev = $stmtPrev->fetch() ?: null;
 
-    // Næste (nyere) indlæg i tidslinjen
+    // Næste (nyere) publicerede indlæg i tidslinjen
     $stmtNext = $db->prepare("
         SELECT id, uid, title, published_at FROM posts
-        WHERE (datetime(published_at) > datetime(:pub))
-           OR (datetime(published_at) = datetime(:pub) AND id > :id)
+        WHERE COALESCE(status, 'published') = 'published'
+          AND ((datetime(published_at) > datetime(:pub))
+           OR (datetime(published_at) = datetime(:pub) AND id > :id))
         ORDER BY datetime(published_at) ASC, id ASC
         LIMIT 1
     ");
@@ -370,6 +394,7 @@ function get_archive_months(): array {
             strftime('%m', published_at) as month,
             COUNT(*) as total
         FROM posts
+        WHERE COALESCE(status, 'published') = 'published'
         GROUP BY year, month
         ORDER BY year DESC, month DESC
     ");
@@ -377,14 +402,15 @@ function get_archive_months(): array {
 }
 
 /**
- * Henter indlæg for en bestemt måned
+ * Henter publicerede indlæg for en bestemt måned
  */
 function get_posts_by_month(string $year, string $month): array {
     $db = get_db();
     $pattern = sprintf('%04d-%02d%%', (int)$year, (int)$month);
     $stmt = $db->prepare("
         SELECT * FROM posts 
-        WHERE published_at LIKE :pattern 
+        WHERE COALESCE(status, 'published') = 'published'
+          AND published_at LIKE :pattern 
         ORDER BY datetime(published_at) DESC, published_at DESC, id DESC
     ");
     $stmt->execute([':pattern' => $pattern]);
@@ -516,7 +542,7 @@ function save_image_data(array|string $image_input): string {
 }
 
 /**
- * Sletter en billedfil sikkert fra uploads-mappen (forhindrer path traversal)
+ * Sletter en billedfil og dens thumbnail sikkert fra uploads-mappen (forhindrer path traversal)
  */
 function delete_uploaded_image(?string $imagePath): void {
     if (empty($imagePath)) {
@@ -530,6 +556,137 @@ function delete_uploaded_image(?string $imagePath): void {
     if (is_file($fullPath)) {
         @unlink($fullPath);
     }
+    $thumbPath = UPLOADS_DIR . '/thumbs/' . pathinfo($safeName, PATHINFO_FILENAME) . '.jpg';
+    if (is_file($thumbPath)) {
+        @unlink($thumbPath);
+    }
+}
+
+/**
+ * Genererer en letvægts-thumbnail (max 480px) til kontaktark, hvis GD er tilgængelig.
+ * Returnerer stien relativt til UPLOADS_DIR (f.eks. 'thumbs/20261112_abc.jpg') eller originalen som fallback.
+ */
+function ensure_thumbnail(?string $imagePath, int $maxDim = 480): string {
+    if (empty($imagePath)) {
+        return '';
+    }
+    $safeName = basename($imagePath);
+    $srcPath = UPLOADS_DIR . '/' . $safeName;
+    if (!is_file($srcPath)) {
+        return $safeName;
+    }
+
+    $thumbDir = UPLOADS_DIR . '/thumbs';
+    $thumbName = pathinfo($safeName, PATHINFO_FILENAME) . '.jpg';
+    $thumbRel = 'thumbs/' . $thumbName;
+    $thumbPath = $thumbDir . '/' . $thumbName;
+
+    if (is_file($thumbPath) && filemtime($thumbPath) >= filemtime($srcPath)) {
+        return $thumbRel;
+    }
+
+    if (!extension_loaded('gd') || !function_exists('imagecreatetruecolor')) {
+        return $safeName;
+    }
+
+    if (!is_dir($thumbDir)) {
+        @mkdir($thumbDir, 0755, true);
+    }
+
+    $info = @getimagesize($srcPath);
+    if (!$info) {
+        return $safeName;
+    }
+    $mime = $info['mime'] ?? '';
+    $srcImg = null;
+    if ($mime === 'image/jpeg' && function_exists('imagecreatefromjpeg')) {
+        $srcImg = @imagecreatefromjpeg($srcPath);
+    } elseif ($mime === 'image/png' && function_exists('imagecreatefrompng')) {
+        $srcImg = @imagecreatefrompng($srcPath);
+    } elseif ($mime === 'image/webp' && function_exists('imagecreatefromwebp')) {
+        $srcImg = @imagecreatefromwebp($srcPath);
+    }
+
+    if (!$srcImg) {
+        return $safeName;
+    }
+
+    $w = imagesx($srcImg);
+    $h = imagesy($srcImg);
+    if ($w <= $maxDim && $h <= $maxDim) {
+        imagedestroy($srcImg);
+        return $safeName;
+    }
+
+    if ($w > $h) {
+        $nw = $maxDim;
+        $nh = max(1, (int)round($h * ($maxDim / $w)));
+    } else {
+        $nh = $maxDim;
+        $nw = max(1, (int)round($w * ($maxDim / $h)));
+    }
+
+    $dst = imagecreatetruecolor($nw, $nh);
+    imagecopyresampled($dst, $srcImg, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    $saved = @imagejpeg($dst, $thumbPath, 82);
+    imagedestroy($srcImg);
+    imagedestroy($dst);
+
+    return $saved ? $thumbRel : $safeName;
+}
+
+/**
+ * Returnerer fuld URL til thumbnail til kontaktark
+ */
+function get_thumbnail_url(?string $imagePath): string {
+    if (empty($imagePath)) {
+        return '';
+    }
+    $rel = ensure_thumbnail($imagePath);
+    return UPLOADS_URL . '/' . str_replace('%2F', '/', rawurlencode($rel));
+}
+
+/**
+ * Henter alle billeder tilhørende et indlæg (op til 3), med fallback til posts.image_path
+ */
+function get_post_images(int $postId, ?string $fallbackImagePath = null): array {
+    $db = get_db();
+    $stmt = $db->prepare("SELECT image_path FROM post_images WHERE post_id = :pid ORDER BY sort_order ASC, id ASC");
+    $stmt->execute([':pid' => $postId]);
+    $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($rows)) {
+        return array_values(array_filter(array_map('strval', $rows)));
+    }
+    if (!empty($fallbackImagePath)) {
+        return [$fallbackImagePath];
+    }
+    return [];
+}
+
+/**
+ * Gemmer op til 3 billeder for et indlæg i post_images og synkroniserer første billede til posts.image_path
+ */
+function set_post_images(int $postId, array $imagePaths): void {
+    $clean = [];
+    foreach ($imagePaths as $p) {
+        $p = basename(trim((string)$p));
+        if ($p !== '' && !in_array($p, $clean, true)) {
+            $clean[] = $p;
+        }
+        if (count($clean) >= 3) {
+            break;
+        }
+    }
+
+    $db = get_db();
+    $db->prepare("DELETE FROM post_images WHERE post_id = :pid")->execute([':pid' => $postId]);
+    $stmtIns = $db->prepare("INSERT INTO post_images (post_id, image_path, sort_order) VALUES (:pid, :path, :ord)");
+    foreach ($clean as $idx => $path) {
+        $stmtIns->execute([':pid' => $postId, ':path' => $path, ':ord' => $idx]);
+    }
+
+    $primary = $clean[0] ?? '';
+    $db->prepare("UPDATE posts SET image_path = :img WHERE id = :pid")->execute([':img' => $primary, ':pid' => $postId]);
 }
 
 /**
@@ -566,10 +723,10 @@ function get_post_og_meta(array $post): ?array {
         return null;
     }
     $uid = !empty($post['uid']) ? $post['uid'] : (string)$post['id'];
-    $style = $post['og_style'] ?? 'polaroid';
+    $style = $post['og_style'] ?? 'notebook';
     $validStyles = ['polaroid', 'darkroom', 'notebook', 'raw'];
     if (!in_array($style, $validStyles, true)) {
-        $style = 'polaroid';
+        $style = 'notebook';
     }
 
     $version = !empty($post['updated_at']) ? strtotime($post['updated_at']) : strtotime($post['published_at'] ?? 'now');
@@ -686,6 +843,8 @@ function get_all_tags_with_counts(): array {
         SELECT t.id, t.name, t.slug, COUNT(pt.post_id) as post_count
         FROM tags t
         JOIN post_tags pt ON pt.tag_id = t.id
+        JOIN posts p ON p.id = pt.post_id
+        WHERE COALESCE(p.status, 'published') = 'published'
         GROUP BY t.id, t.name, t.slug
         HAVING post_count > 0
         ORDER BY post_count DESC, t.name ASC
@@ -694,14 +853,15 @@ function get_all_tags_with_counts(): array {
 }
 
 /**
- * Henter alle anvendte lokationer med optælling af indlæg
+ * Henter alle anvendte lokationer med optælling af publicerede indlæg
  */
 function get_all_locations_with_counts(): array {
     $db = get_db();
     $stmt = $db->query("
         SELECT trim(location) as location, COUNT(*) as post_count
         FROM posts
-        WHERE location IS NOT NULL AND trim(location) != ''
+        WHERE COALESCE(status, 'published') = 'published'
+          AND location IS NOT NULL AND trim(location) != ''
         GROUP BY trim(location)
         HAVING post_count > 0
         ORDER BY post_count DESC, location ASC
@@ -785,6 +945,7 @@ function get_posts_by_tag(string $tagSlug, int $limit = 10, int $offset = 0): ar
         JOIN post_tags pt ON pt.post_id = p.id
         JOIN tags t ON t.id = pt.tag_id
         WHERE t.slug = :slug
+          AND COALESCE(p.status, 'published') = 'published'
         ORDER BY datetime(p.published_at) DESC, p.published_at DESC, p.id DESC
         LIMIT :limit OFFSET :offset
     ");
@@ -796,7 +957,7 @@ function get_posts_by_tag(string $tagSlug, int $limit = 10, int $offset = 0): ar
 }
 
 /**
- * Tæller antal indlæg for et bestemt tag
+ * Tæller antal publicerede indlæg for et bestemt tag
  */
 function count_posts_by_tag(string $tagSlug): int {
     $db = get_db();
@@ -806,6 +967,7 @@ function count_posts_by_tag(string $tagSlug): int {
         JOIN post_tags pt ON pt.post_id = p.id
         JOIN tags t ON t.id = pt.tag_id
         WHERE t.slug = :slug
+          AND COALESCE(p.status, 'published') = 'published'
     ");
     $stmt->execute([':slug' => $tagSlug]);
     return (int)$stmt->fetchColumn();
@@ -829,7 +991,8 @@ function get_posts_by_location(string $location, int $limit = 10, int $offset = 
     $db = get_db();
     $stmt = $db->prepare("
         SELECT * FROM posts 
-        WHERE trim(location) = trim(:location)
+        WHERE COALESCE(status, 'published') = 'published'
+          AND trim(location) = trim(:location)
         ORDER BY datetime(published_at) DESC, published_at DESC, id DESC
         LIMIT :limit OFFSET :offset
     ");
@@ -841,25 +1004,29 @@ function get_posts_by_location(string $location, int $limit = 10, int $offset = 
 }
 
 /**
- * Tæller antal indlæg for en bestemt lokation
+ * Tæller antal publicerede indlæg for en bestemt lokation
  */
 function count_posts_by_location(string $location): int {
     $db = get_db();
     $stmt = $db->prepare("
         SELECT COUNT(*) FROM posts 
-        WHERE trim(location) = trim(:location)
+        WHERE COALESCE(status, 'published') = 'published'
+          AND trim(location) = trim(:location)
     ");
     $stmt->execute([':location' => $location]);
     return (int)$stmt->fetchColumn();
 }
 
 /**
- * Formaterer en læsevenlig retro EXIF-streng: f.eks. "Leica Q2 · 28mm · ƒ/2.8 · 1/250s · ISO 400"
+ * Formaterer en læsevenlig retro EXIF-streng: f.eks. "FUJIFILM X-Pro3 · XF 35mm f/1.4 · ƒ/2.8 · 1/250s · ISO 400 · Classic Chrome"
  */
 function format_exif(array $post): ?string {
     $parts = [];
     if (!empty($post['exif_camera'])) {
         $parts[] = trim((string)$post['exif_camera']);
+    }
+    if (!empty($post['exif_lens'])) {
+        $parts[] = trim((string)$post['exif_lens']);
     }
     if (!empty($post['exif_focal'])) {
         $parts[] = trim((string)$post['exif_focal']);
@@ -873,6 +1040,9 @@ function format_exif(array $post): ?string {
     if (!empty($post['exif_iso'])) {
         $parts[] = trim((string)$post['exif_iso']);
     }
+    if (!empty($post['exif_film_sim'])) {
+        $parts[] = trim((string)$post['exif_film_sim']);
+    }
 
     if (empty($parts)) {
         return null;
@@ -882,11 +1052,12 @@ function format_exif(array $post): ?string {
 }
 
 /**
- * Udtrækker kamera, brændvidde, blænde, lukkertid, ISO og optagedato fra et lokalt billede via PHP exif
+ * Udtrækker kamera, objektiv, brændvidde, blænde, lukkertid, ISO og optagedato fra et lokalt billede via PHP exif
  */
 function extract_exif_from_image_file(string $filePath): array {
     $result = [
         'camera' => null,
+        'lens' => null,
         'focal' => null,
         'aperture' => null,
         'shutter' => null,
@@ -904,7 +1075,7 @@ function extract_exif_from_image_file(string $filePath): array {
             return $result;
         }
 
-        // Kamera / Objektiv
+        // Kamera og objektiv separat
         $make = trim((string)($exif['Make'] ?? ''));
         $model = trim((string)($exif['Model'] ?? ''));
         $lens = trim((string)($exif['UndefinedTag:0xA434'] ?? $exif['LensModel'] ?? ''));
@@ -914,8 +1085,9 @@ function extract_exif_from_image_file(string $filePath): array {
             } else {
                 $result['camera'] = $model;
             }
-        } elseif ($lens !== '') {
-            $result['camera'] = $lens;
+        }
+        if ($lens !== '') {
+            $result['lens'] = $lens;
         }
 
         // Brændvidde (FocalLengthIn35mmFilm eller FocalLength)

@@ -652,27 +652,29 @@ require_once __DIR__ . '/../includes/auth.php';
     <div id="viewCompose" class="view-section">
         <form id="postForm" onsubmit="handleCreatePost(event)">
             
-            <!-- Billedvælger -->
+            <!-- Billedvælger (1–3 billeder / diptykon) -->
             <div class="form-group">
                 <input 
                     type="file" 
                     id="fileInput" 
                     accept="image/*" 
+                    multiple
                     style="display: none;" 
                     onchange="handleImageSelected(event)"
                 >
                 <div class="photo-picker" id="photoDropArea" onclick="document.getElementById('fileInput').click()">
                     <span class="photo-picker-icon">[ ⌀ FOTO ]</span>
                     <div class="photo-picker-text" id="photoPickerPrompt">
-                        <strong>Tryk her for at vælge dagens fotografi</strong><br>
+                        <strong>Tryk her for at vælge dagens fotografi (op til 3 til diptykon)</strong><br>
                         (Udlæser automatisk optagedato, GPS &amp; EXIF)
                     </div>
                     <img id="imagePreview" class="photo-preview" alt="Preview">
                 </div>
+                <div id="selectedPhotosStrip" style="display: none; gap: 8px; flex-wrap: wrap; margin-top: 8px;"></div>
                 <div id="imageResInfo" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 4px; display: none;"></div>
             </div>
 
-            <!-- Kameradata (EXIF) inkl. Kamera/Optik og Brændvidde -->
+            <!-- Kameradata (EXIF) inkl. Kamera, Optik, Filmsimulering og Brændvidde -->
             <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
                     <label class="form-label" style="margin-bottom: 0;">Kameradata &amp; Optik (EXIF)</label>
@@ -680,14 +682,23 @@ require_once __DIR__ . '/../includes/auth.php';
                         Udlæses automatisk fra foto
                     </span>
                 </div>
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-bottom: 8px;">
-                    <input type="text" id="exifCameraInput" class="form-control" placeholder="Kamera / Optik / Film (f.eks. Leica Q2)" title="Kamera, objektiv eller filmtype">
-                    <input type="text" id="exifFocalInput" class="form-control" placeholder="f.eks. 35mm" title="Brændvidde">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                    <input type="text" id="exifCameraInput" class="form-control" placeholder="Kamera (f.eks. FUJIFILM X-Pro3)" title="Kamera">
+                    <input type="text" id="exifLensInput" class="form-control" placeholder="Objektiv (f.eks. XF 35mm f/1.4)" title="Objektiv">
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
-                    <input type="text" id="exifApertureInput" class="form-control" placeholder="f.eks. ƒ/2.8" title="Blænde">
-                    <input type="text" id="exifShutterInput" class="form-control" placeholder="f.eks. 1/250s" title="Lukkertid">
-                    <input type="text" id="exifIsoInput" class="form-control" placeholder="f.eks. ISO 400" title="ISO">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                    <input type="text" id="exifFocalInput" class="form-control" placeholder="35mm" title="Brændvidde">
+                    <input type="text" id="exifApertureInput" class="form-control" placeholder="ƒ/2.8" title="Blænde">
+                    <input type="text" id="exifShutterInput" class="form-control" placeholder="1/250s" title="Lukkertid">
+                    <input type="text" id="exifIsoInput" class="form-control" placeholder="ISO 400" title="ISO">
+                </div>
+                <input type="text" id="exifFilmSimInput" class="form-control" placeholder="Filmsimulering / Film (f.eks. Classic Chrome, Acros)" title="Fuji filmsimulering eller filmtype">
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+                    <button type="button" class="btn-small" style="font-size: 11px; padding: 3px 8px;" onclick="setFilmSim('Classic Chrome')">Classic Chrome</button>
+                    <button type="button" class="btn-small" style="font-size: 11px; padding: 3px 8px;" onclick="setFilmSim('Acros')">Acros</button>
+                    <button type="button" class="btn-small" style="font-size: 11px; padding: 3px 8px;" onclick="setFilmSim('Nostalgic Neg')">Nostalgic Neg</button>
+                    <button type="button" class="btn-small" style="font-size: 11px; padding: 3px 8px;" onclick="setFilmSim('Classic Neg')">Classic Neg</button>
+                    <button type="button" class="btn-small" style="font-size: 11px; padding: 3px 8px;" onclick="setFilmSim('Provia')">Provia</button>
                 </div>
             </div>
 
@@ -793,7 +804,7 @@ require_once __DIR__ . '/../includes/auth.php';
                 </div>
                 
                 <div class="og-style-selector" id="ogStyleSelector">
-                    <button type="button" class="og-style-btn active" data-style="polaroid" onclick="setOgStyle('polaroid')">
+                    <button type="button" class="og-style-btn" data-style="polaroid" onclick="setOgStyle('polaroid')">
                         <span class="og-style-icon">📷</span>
                         <span class="og-style-label">Polaroid</span>
                     </button>
@@ -801,7 +812,7 @@ require_once __DIR__ . '/../includes/auth.php';
                         <span class="og-style-icon">🎞️</span>
                         <span class="og-style-label">35mm Film</span>
                     </button>
-                    <button type="button" class="og-style-btn" data-style="notebook" onclick="setOgStyle('notebook')">
+                    <button type="button" class="og-style-btn active" data-style="notebook" onclick="setOgStyle('notebook')">
                         <span class="og-style-icon">📓</span>
                         <span class="og-style-label">Notesbog</span>
                     </button>
@@ -827,10 +838,15 @@ require_once __DIR__ . '/../includes/auth.php';
                 </div>
             </div>
 
-            <!-- Gem knap -->
-            <button type="submit" class="btn-primary" id="savePostBtn">
-                Gem i logbog
-            </button>
+            <!-- Gem / Kladde knapper -->
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px;">
+                <button type="button" class="btn-small" id="saveDraftBtn" onclick="submitPostWithStatus('draft')" style="padding: 14px 10px; font-family: var(--font-mono); font-size: 13px; font-weight: 600;">
+                    [ GEM KLADDE ]
+                </button>
+                <button type="submit" class="btn-primary" id="savePostBtn">
+                    Udgiv i logbog
+                </button>
+            </div>
         </form>
     </div>
 
@@ -904,8 +920,12 @@ require_once __DIR__ . '/../includes/auth.php';
             <h3 class="settings-title">[ SKIFT PIN-KODE ]</h3>
             <form onsubmit="handleUpdatePin(event)">
                 <div class="form-group">
-                    <label class="form-label">Ny PIN-kode (min. 4 tegn)</label>
-                    <input type="password" id="newPinInput" class="form-control" required minlength="4" placeholder="Ny PIN">
+                    <label class="form-label">Nuværende PIN-kode</label>
+                    <input type="password" id="currentPinInput" class="form-control" required placeholder="Nuværende PIN">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ny PIN-kode (min. 6 tegn)</label>
+                    <input type="password" id="newPinInput" class="form-control" required minlength="6" placeholder="Ny PIN (min. 6 tegn)">
                 </div>
                 <button type="submit" class="btn-small" style="padding: 10px 16px;">Opdater PIN</button>
             </form>
@@ -991,15 +1011,24 @@ require_once __DIR__ . '/../includes/auth.php';
             </div>
             <div class="form-group">
                 <label class="form-label">Kameradata &amp; Optik (EXIF)</label>
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-bottom: 8px;">
-                    <input type="text" id="editExifCamera" class="form-control" placeholder="Kamera / Optik / Film" title="Kamera, objektiv eller filmtype">
-                    <input type="text" id="editExifFocal" class="form-control" placeholder="f.eks. 35mm" title="Brændvidde">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                    <input type="text" id="editExifCamera" class="form-control" placeholder="Kamera" title="Kamera">
+                    <input type="text" id="editExifLens" class="form-control" placeholder="Objektiv" title="Objektiv">
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
-                    <input type="text" id="editExifAperture" class="form-control" placeholder="f.eks. ƒ/2.8" title="Blænde">
-                    <input type="text" id="editExifShutter" class="form-control" placeholder="f.eks. 1/250s" title="Lukkertid">
-                    <input type="text" id="editExifIso" class="form-control" placeholder="f.eks. ISO 400" title="ISO">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                    <input type="text" id="editExifFocal" class="form-control" placeholder="35mm" title="Brændvidde">
+                    <input type="text" id="editExifAperture" class="form-control" placeholder="ƒ/2.8" title="Blænde">
+                    <input type="text" id="editExifShutter" class="form-control" placeholder="1/250s" title="Lukkertid">
+                    <input type="text" id="editExifIso" class="form-control" placeholder="ISO 400" title="ISO">
                 </div>
+                <input type="text" id="editExifFilmSim" class="form-control" placeholder="Filmsimulering / Film" title="Filmsimulering">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="editStatusSelect">Status</label>
+                <select id="editStatusSelect" class="form-control">
+                    <option value="published">Publiceret (synlig i logbogen)</option>
+                    <option value="draft">Kladde (kun synlig her i appen)</option>
+                </select>
             </div>
             <div class="form-group" style="margin-top: 14px;">
                 <label class="form-label">Delingskort (Sociale medier)</label>
@@ -1053,8 +1082,12 @@ if ('serviceWorker' in navigator) {
 }
 
 let compressedImageData = null;
+let selectedImagesData = []; // Op til 3 billeder (diptykon / serie)
 let editCompressedImageData = null;
+let csrfToken = '';
 const DRAFT_STORAGE_KEY = 'logbog_draft_v1';
+// Ryd evt. tidligere token fra localStorage (vi bruger nu kun HttpOnly-cookie + CSRF)
+try { localStorage.removeItem('logbog_token'); } catch (_) {}
 
 // Initialiser standard dato
 function setDefaultDate() {
@@ -1105,14 +1138,13 @@ function switchView(viewName) {
     window.scrollTo(0, 0);
 }
 
-// Robust API-kald hjælper (sender altid token i Authorization header eller JSON-body, aldrig i URL)
+// Robust API-kald hjælper (bruger HttpOnly-cookie + sessions-bundet X-CSRF-Token)
 async function apiFetch(action, options = {}) {
-    const token = localStorage.getItem('logbog_token') || '';
     const method = options.method || 'GET';
     const headers = options.headers || {};
 
-    if (token) {
-        headers['Authorization'] = 'Bearer ' + token;
+    if (method === 'POST' && csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
     }
 
     let url = 'api.php?action=' + encodeURIComponent(action);
@@ -1128,14 +1160,14 @@ async function apiFetch(action, options = {}) {
     if (method === 'POST') {
         if (typeof body === 'object' && !(body instanceof FormData)) {
             headers['Content-Type'] = 'application/json';
-            body = JSON.stringify({ ...body, token: token });
+            body = JSON.stringify(body);
         } else if (!body) {
             headers['Content-Type'] = 'application/json';
-            body = JSON.stringify({ token: token });
+            body = JSON.stringify({});
         }
     }
 
-    const res = await fetch(url, { method, headers, body });
+    const res = await fetch(url, { method, headers, body, credentials: 'same-origin' });
     const rawText = await res.text();
     let data = null;
     try {
@@ -1148,11 +1180,15 @@ async function apiFetch(action, options = {}) {
 
     if (!res.ok) {
         if (res.status === 401) {
-            localStorage.removeItem('logbog_token');
+            csrfToken = '';
             switchView('login');
             throw new Error(data.error || 'Session udløbet. Log ind igen.');
         }
         throw new Error(data.error || 'Fejl fra server (' + res.status + ')');
+    }
+
+    if (data && data.csrf_token) {
+        csrfToken = data.csrf_token;
     }
 
     return data;
@@ -1163,6 +1199,7 @@ async function checkAuthStatus() {
     try {
         const data = await apiFetch('check_auth');
         if (data && data.authenticated) {
+            if (data.csrf_token) csrfToken = data.csrf_token;
             setDefaultDate();
             restoreDraft();
             switchView('compose');
@@ -1188,7 +1225,7 @@ async function handleLogin(e) {
             body: { pin }
         });
         if (data.success) {
-            localStorage.setItem('logbog_token', data.token);
+            if (data.csrf_token) csrfToken = data.csrf_token;
             showAlert('Logget ind!', 'success', 2000);
             document.getElementById('pinInput').value = '';
             setDefaultDate();
@@ -1220,7 +1257,7 @@ function escapeHtml(str) {
 }
 
 // Tilstand for delingskort (Social Share / Open Graph)
-let currentOgStyle = 'polaroid';
+let currentOgStyle = 'notebook';
 let editOgStyle = 'polaroid';
 let cachedPreviewImg = null;
 
@@ -1650,7 +1687,7 @@ async function extractExifFromFile(file) {
             });
 
             if (data) {
-                // Kamera & Objektiv
+                // Kamera & Objektiv separat
                 const make = (data.Make || '').trim();
                 const model = (data.Model || '').trim();
                 const lens = (data.LensModel || '').trim();
@@ -1658,8 +1695,9 @@ async function extractExifFromFile(file) {
                     result.camera = (make && !model.toLowerCase().includes(make.toLowerCase()))
                         ? `${make} ${model}`
                         : model;
-                } else if (lens) {
-                    result.camera = lens;
+                }
+                if (lens) {
+                    result.lens = lens;
                 }
 
                 // Brændvidde
@@ -1895,18 +1933,39 @@ function readExifDateString(view, offset, maxLen) {
     return null;
 }
 
-// Skaler og optimer billede skånsomt (2400px @ 92% JPEG-kvalitet for at bevare filmkorn og toneovergange)
+function setFilmSim(name) {
+    const el = document.getElementById('exifFilmSimInput');
+    if (el) el.value = name;
+}
+
+// Smart hybrid billedhåndtering:
+// Behold originalen direkte (100% Fuji-farver/skarphed), hvis den er <= 2400px og < 4 MB i JPEG/PNG/WebP.
+// Ellers skaler skånsomt til 2400px @ 92% JPEG.
 function compressImageFileToDataUrl(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onerror = () => reject(new Error('Kunne ikke læse billedfil'));
         reader.onload = function(event) {
+            const rawDataUrl = event.target.result;
             const img = new Image();
-            img.onerror = () => reject(new Error('Ugyldigt billede'));
+            img.onerror = () => reject(new Error('Ugyldigt billede (HEIC kræver Safari eller eksport til JPEG)'));
             img.onload = function() {
                 const maxDimension = 2400;
+                const maxDirectBytes = 4 * 1024 * 1024;
+                const supportedDirectTypes = ['image/jpeg', 'image/png', 'image/webp'];
                 let width = img.width;
                 let height = img.height;
+
+                if (
+                    width <= maxDimension &&
+                    height <= maxDimension &&
+                    file.size <= maxDirectBytes &&
+                    supportedDirectTypes.includes(file.type)
+                ) {
+                    const approxSizeKb = Math.round(file.size / 1024);
+                    resolve({ dataUrl: rawDataUrl, width, height, approxSizeKb, originalPreserved: true });
+                    return;
+                }
 
                 if (width > maxDimension || height > maxDimension) {
                     if (width > height) {
@@ -1926,12 +1985,55 @@ function compressImageFileToDataUrl(file) {
 
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
                 const approxSizeKb = Math.round((dataUrl.length * 3 / 4) / 1024);
-                resolve({ dataUrl, width, height, approxSizeKb });
+                resolve({ dataUrl, width, height, approxSizeKb, originalPreserved: false });
             };
-            img.src = event.target.result;
+            img.src = rawDataUrl;
         };
         reader.readAsDataURL(file);
     });
+}
+
+function renderSelectedPhotosStrip() {
+    const strip = document.getElementById('selectedPhotosStrip');
+    const preview = document.getElementById('imagePreview');
+    const prompt = document.getElementById('photoPickerPrompt');
+    if (!strip) return;
+
+    if (selectedImagesData.length === 0) {
+        strip.style.display = 'none';
+        strip.innerHTML = '';
+        preview.style.display = 'none';
+        prompt.style.display = 'block';
+        compressedImageData = null;
+        cachedPreviewImg = null;
+        renderOgLivePreview();
+        return;
+    }
+
+    compressedImageData = selectedImagesData[0].dataUrl;
+    preview.src = compressedImageData;
+    preview.style.display = 'block';
+    prompt.style.display = 'none';
+    cachedPreviewImg = null;
+    renderOgLivePreview();
+
+    if (selectedImagesData.length === 1) {
+        strip.style.display = 'none';
+        strip.innerHTML = '';
+    } else {
+        strip.style.display = 'flex';
+        strip.innerHTML = selectedImagesData.map((item, idx) => `
+            <div style="position: relative; width: 64px; height: 64px; border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden;">
+                <img src="${item.dataUrl}" style="width: 100%; height: 100%; object-fit: cover;">
+                <button type="button" onclick="removeSelectedPhoto(${idx}); event.stopPropagation();" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.75); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; line-height: 18px; cursor: pointer;">×</button>
+            </div>
+        `).join('');
+    }
+}
+
+function removeSelectedPhoto(idx) {
+    selectedImagesData.splice(idx, 1);
+    renderSelectedPhotosStrip();
 }
 
 // Reverse geocoding (bruges både ved EXIF-GPS fra foto og ved manuel GPS-knap)
@@ -1966,24 +2068,27 @@ async function reverseGeocodeCoords(lat, lon, fromPhotoExif = false) {
     return null;
 }
 
-// Billedbehandling & Klient-optimering (Canvas)
+// Billedbehandling (1-3 billeder / diptykon) & smart hybrid-optimering
 async function handleImageSelected(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []).slice(0, 3);
+    if (files.length === 0) return;
 
-    // 1. Udtræk EXIF direkte fra råfilen før canvas-komprimering
+    const primaryFile = files[0];
+
+    // 1. Udtræk EXIF direkte fra råfilen før evt. skalering
     try {
-        const exifData = await extractExifFromFile(file);
+        const exifData = await extractExifFromFile(primaryFile);
         if (exifData) {
             currentExifData = exifData;
 
             if (exifData.camera) document.getElementById('exifCameraInput').value = exifData.camera;
+            if (exifData.lens && document.getElementById('exifLensInput')) document.getElementById('exifLensInput').value = exifData.lens;
             if (exifData.focal) document.getElementById('exifFocalInput').value = exifData.focal;
             if (exifData.aperture) document.getElementById('exifApertureInput').value = exifData.aperture;
             if (exifData.shutter) document.getElementById('exifShutterInput').value = exifData.shutter;
             if (exifData.iso) document.getElementById('exifIsoInput').value = exifData.iso;
 
-            const parts = [exifData.camera, exifData.focal, exifData.aperture, exifData.shutter, exifData.iso].filter(Boolean);
+            const parts = [exifData.camera, exifData.lens, exifData.focal, exifData.aperture, exifData.shutter, exifData.iso].filter(Boolean);
             const badge = document.getElementById('exifStatusBadge');
             if (badge) {
                 if (parts.length > 0) {
@@ -1995,7 +2100,6 @@ async function handleImageSelected(e) {
                 }
             }
 
-            // Hvis fotoet indeholder optagedato, opdater automatisk Dato & Klokkeslæt
             if (exifData.date && exifData.date instanceof Date && !isNaN(exifData.date.getTime())) {
                 const d = exifData.date;
                 const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -2009,7 +2113,6 @@ async function handleImageSelected(e) {
                 }
             }
 
-            // Hvis fotoet indeholder GPS-koordinater, sæt koordinater OG slå automatisk stednavn op!
             if (typeof exifData.latitude === 'number' && typeof exifData.longitude === 'number') {
                 document.getElementById('latInput').value = exifData.latitude;
                 document.getElementById('lonInput').value = exifData.longitude;
@@ -2020,20 +2123,20 @@ async function handleImageSelected(e) {
         console.warn('EXIF udtræk bemærkning:', err);
     }
 
-    // 2. Skaler til 2400px @ 92% JPEG
+    // 2. Behandl billeder (smart hybrid)
     try {
-        const res = await compressImageFileToDataUrl(file);
-        compressedImageData = res.dataUrl;
-        cachedPreviewImg = null;
-        renderOgLivePreview();
+        selectedImagesData = [];
+        for (const f of files) {
+            const res = await compressImageFileToDataUrl(f);
+            selectedImagesData.push(res);
+        }
+        renderSelectedPhotosStrip();
 
-        const preview = document.getElementById('imagePreview');
-        preview.src = compressedImageData;
-        preview.style.display = 'block';
-        document.getElementById('photoPickerPrompt').style.display = 'none';
-
+        const first = selectedImagesData[0];
         const info = document.getElementById('imageResInfo');
-        info.textContent = `Optimeret: ${res.width}×${res.height}px (92% kvalitet · ~${res.approxSizeKb} KB)`;
+        const modeLabel = first.originalPreserved ? 'Original bevaret' : 'Skaleret 92% JPEG';
+        const countLabel = selectedImagesData.length > 1 ? ` · ${selectedImagesData.length} fotos (diptykon)` : '';
+        info.textContent = `${modeLabel}: ${first.width}×${first.height}px (~${first.approxSizeKb} KB)${countLabel}`;
         info.style.display = 'block';
     } catch (err) {
         showAlert(err.message || 'Kunne ikke indlæse billede', 'error');
@@ -2285,18 +2388,27 @@ function fetchGPSLocation() {
     );
 }
 
-// Opret nyt indlæg
+// Opret nyt indlæg (eller gem som kladde)
 async function handleCreatePost(e) {
     e.preventDefault();
+    await submitPostWithStatus('published');
+}
 
-    if (!compressedImageData) {
-        showAlert('Vælg eller tag venligst et billede først', 'error');
+async function submitPostWithStatus(status = 'published') {
+    const imagesPayload = selectedImagesData.length > 0
+        ? selectedImagesData.map(x => x.dataUrl)
+        : (compressedImageData ? [compressedImageData] : []);
+
+    if (imagesPayload.length === 0) {
+        showAlert('Vælg eller tag venligst mindst ét billede først', 'error');
         return;
     }
 
     const saveBtn = document.getElementById('savePostBtn');
+    const draftBtn = document.getElementById('saveDraftBtn');
     saveBtn.disabled = true;
-    saveBtn.textContent = 'Gemmer i logbog...';
+    if (draftBtn) draftBtn.disabled = true;
+    saveBtn.textContent = status === 'draft' ? 'Gemmer kladde...' : 'Udgiver...';
 
     const payload = {
         title: document.getElementById('titleInput').value,
@@ -2305,14 +2417,17 @@ async function handleCreatePost(e) {
         latitude: document.getElementById('latInput').value,
         longitude: document.getElementById('lonInput').value,
         published_at: document.getElementById('dateInput').value,
-        image_data: compressedImageData,
+        status: status,
+        images_data: imagesPayload,
         og_style: currentOgStyle,
         tags: selectedTags,
         exif_camera: (document.getElementById('exifCameraInput')?.value || '').trim(),
+        exif_lens: (document.getElementById('exifLensInput')?.value || '').trim(),
         exif_focal: (document.getElementById('exifFocalInput')?.value || '').trim(),
         exif_aperture: (document.getElementById('exifApertureInput')?.value || '').trim(),
         exif_shutter: (document.getElementById('exifShutterInput')?.value || '').trim(),
-        exif_iso: (document.getElementById('exifIsoInput')?.value || '').trim()
+        exif_iso: (document.getElementById('exifIsoInput')?.value || '').trim(),
+        exif_film_sim: (document.getElementById('exifFilmSimInput')?.value || '').trim()
     };
 
     try {
@@ -2322,18 +2437,22 @@ async function handleCreatePost(e) {
         });
 
         if (data.success) {
-            showAlert('✓ Dit indlæg er gemt i logbogen!', 'success', 4000);
+            showAlert(status === 'draft' ? '✓ Kladde gemt! Du finder den under "Indlæg".' : '✓ Dit indlæg er udgivet i logbogen!', 'success', 4000);
             document.getElementById('postForm').reset();
             compressedImageData = null;
+            selectedImagesData = [];
             currentExifData = null;
             selectedTags = [];
             clearDraft(false);
             renderSelectedTags();
+            renderSelectedPhotosStrip();
             document.getElementById('exifCameraInput').value = '';
+            if (document.getElementById('exifLensInput')) document.getElementById('exifLensInput').value = '';
             document.getElementById('exifFocalInput').value = '';
             document.getElementById('exifApertureInput').value = '';
             document.getElementById('exifShutterInput').value = '';
             document.getElementById('exifIsoInput').value = '';
+            if (document.getElementById('exifFilmSimInput')) document.getElementById('exifFilmSimInput').value = '';
             const exifBadge = document.getElementById('exifStatusBadge');
             if (exifBadge) {
                 exifBadge.textContent = 'Udlæses automatisk fra foto';
@@ -2349,7 +2468,7 @@ async function handleCreatePost(e) {
             document.getElementById('imageResInfo').style.display = 'none';
             setDefaultDate();
             loadRecentTags();
-            setOgStyle('polaroid');
+            setOgStyle('notebook');
             cachedPreviewImg = null;
             renderOgLivePreview();
         }
@@ -2357,7 +2476,8 @@ async function handleCreatePost(e) {
         showAlert(err.message || 'Fejl under gemning', 'error');
     } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = 'Gem i logbog';
+        if (draftBtn) draftBtn.disabled = false;
+        saveBtn.textContent = 'Udgiv i logbog';
     }
 }
 
@@ -2444,16 +2564,18 @@ async function loadPostsHistory(reset = true) {
                 const dateStr = (p.published_at || '').substring(0, 10);
                 const tagNames = (p.tags || []).map(t => '#' + t.name).join(' ');
                 const postIdentifier = encodeURIComponent(p.uid || p.id);
+                const isDraft = p.status === 'draft';
+                const draftBadge = isDraft ? `<span style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-red); border: 1px dashed var(--accent-red); padding: 1px 5px; margin-left: 6px;">KLADDE</span>` : '';
                 html += `
                     <div class="history-item" id="hist-${Number(p.id)}">
                         <img src="${imgUrl}" class="history-thumb" alt="">
                         <div class="history-info">
-                            <div class="history-title">${escapeHtml(p.title)}</div>
+                            <div class="history-title">${escapeHtml(p.title)}${draftBadge}</div>
                             <div class="history-date">[${escapeHtml(dateStr)}] ${p.location ? '• ' + escapeHtml(p.location) : ''}</div>
                             ${tagNames ? `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(tagNames)}</div>` : ''}
                         </div>
                         <div class="history-actions">
-                            <a href="../post.php?p=${postIdentifier}" target="_blank" class="btn-small" style="text-decoration:none;">Vis</a>
+                            <a href="../post/${postIdentifier}" target="_blank" class="btn-small" style="text-decoration:none;">Vis</a>
                             <button type="button" onclick="openEditModal(${Number(p.id)})" class="btn-small">Rediger</button>
                             <button type="button" onclick="deletePost(${Number(p.id)})" class="btn-small btn-danger">Slet</button>
                         </div>
@@ -2536,12 +2658,15 @@ async function openEditModal(id) {
         renderEditSelectedTags();
 
         document.getElementById('editExifCamera').value = p.exif_camera || '';
+        if (document.getElementById('editExifLens')) document.getElementById('editExifLens').value = p.exif_lens || '';
         document.getElementById('editExifFocal').value = p.exif_focal || '';
         document.getElementById('editExifAperture').value = p.exif_aperture || '';
         document.getElementById('editExifShutter').value = p.exif_shutter || '';
         document.getElementById('editExifIso').value = p.exif_iso || '';
+        if (document.getElementById('editExifFilmSim')) document.getElementById('editExifFilmSim').value = p.exif_film_sim || '';
+        if (document.getElementById('editStatusSelect')) document.getElementById('editStatusSelect').value = p.status || 'published';
 
-        setEditOgStyle(p.og_style || 'polaroid');
+        setEditOgStyle(p.og_style || 'notebook');
 
         document.getElementById('editModal').classList.add('active');
     } catch (e) {
@@ -2567,13 +2692,16 @@ async function handleSaveEdit(e) {
         location: document.getElementById('editLocInput').value,
         content: document.getElementById('editContentInput').value,
         published_at: document.getElementById('editDateInput').value,
+        status: document.getElementById('editStatusSelect') ? document.getElementById('editStatusSelect').value : 'published',
         og_style: editOgStyle,
         tags: editSelectedTags,
         exif_camera: document.getElementById('editExifCamera').value,
+        exif_lens: document.getElementById('editExifLens') ? document.getElementById('editExifLens').value : '',
         exif_focal: document.getElementById('editExifFocal').value,
         exif_aperture: document.getElementById('editExifAperture').value,
         exif_shutter: document.getElementById('editExifShutter').value,
-        exif_iso: document.getElementById('editExifIso').value
+        exif_iso: document.getElementById('editExifIso').value,
+        exif_film_sim: document.getElementById('editExifFilmSim') ? document.getElementById('editExifFilmSim').value : ''
     };
 
     if (editCompressedImageData) {
@@ -2661,19 +2789,19 @@ async function toggleLockdown() {
     }
 }
 
-// Download database backup via POST + Bearer token
+// Download database backup via POST + HttpOnly cookie + CSRF
 async function downloadDatabaseBackup() {
     const btn = document.getElementById('btnBackupDb');
     if (btn) btn.disabled = true;
     try {
-        const token = localStorage.getItem('logbog_token') || '';
         const res = await fetch('api.php?action=backup', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
-                'Authorization': 'Bearer ' + token,
+                'X-CSRF-Token': csrfToken,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ token })
+            body: JSON.stringify({})
         });
         if (!res.ok) {
             throw new Error('Kunne ikke hente backup (' + res.status + ')');
@@ -2699,18 +2827,18 @@ async function downloadDatabaseBackup() {
 // Opdater PIN
 async function handleUpdatePin(e) {
     e.preventDefault();
+    const currentPin = document.getElementById('currentPinInput').value;
     const newPin = document.getElementById('newPinInput').value;
 
     try {
         const data = await apiFetch('update_pin', {
             method: 'POST',
-            body: { new_pin: newPin }
+            body: { current_pin: currentPin, new_pin: newPin }
         });
         if (data.success) {
-            if (data.token) {
-                localStorage.setItem('logbog_token', data.token);
-            }
+            if (data.csrf_token) csrfToken = data.csrf_token;
             showAlert('✓ PIN-koden er ændret!', 'success', 3000);
+            document.getElementById('currentPinInput').value = '';
             document.getElementById('newPinInput').value = '';
         }
     } catch (e) {
@@ -2723,9 +2851,7 @@ async function handleRevokeSessions() {
     try {
         const data = await apiFetch('revoke_sessions', { method: 'POST' });
         if (data.success) {
-            if (data.token) {
-                localStorage.setItem('logbog_token', data.token);
-            }
+            if (data.csrf_token) csrfToken = data.csrf_token;
             showAlert('✓ ' + data.message, 'success', 3500);
         }
     } catch (e) {
@@ -2738,7 +2864,7 @@ async function handleLogout() {
     try {
         await apiFetch('logout', { method: 'POST' });
     } catch (e) {}
-    localStorage.removeItem('logbog_token');
+    csrfToken = '';
     switchView('login');
 }
 

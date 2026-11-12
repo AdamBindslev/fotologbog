@@ -3,10 +3,11 @@
  * Post Card skabelon – Enkelt opslag i notesbogs-feedet
  */
 $uid = !empty($post['uid']) ? $post['uid'] : (string)$post['id'];
-$postUrl = BASE_URL . '/post.php?p=' . htmlspecialchars($uid);
+$postUrl = htmlspecialchars(get_post_url($post));
 $postTags = get_post_tags((int)$post['id']);
 $exifStr = format_exif($post);
-$imgFullUrl = !empty($post['image_path']) ? UPLOADS_URL . '/' . htmlspecialchars($post['image_path']) : '';
+$postImages = get_post_images((int)$post['id'], $post['image_path'] ?? null);
+$imgFullUrl = !empty($postImages[0]) ? UPLOADS_URL . '/' . htmlspecialchars($postImages[0]) : '';
 $analogStamp = format_analog_header($post['published_at'], $post['location'] ?? null);
 ?>
 <article class="log-entry" id="entry-<?= htmlspecialchars($uid) ?>">
@@ -36,8 +37,9 @@ $analogStamp = format_analog_header($post['published_at'], $post['location'] ?? 
         <a href="<?= $postUrl ?>"><?= htmlspecialchars($post['title']) ?></a>
     </h2>
 
-    <?php if (!empty($post['image_path'])): 
+    <?php if (!empty($postImages)): 
         $tapeVariant = get_tape_variant($uid);
+        $imgCount = count($postImages);
     ?>
         <div class="entry-photo-wrap tape-style-<?= $tapeVariant ?>">
             <?php if ($tapeVariant === 1): ?>
@@ -53,17 +55,39 @@ $analogStamp = format_analog_header($post['published_at'], $post['location'] ?? 
                 <span class="photo-tape tape-top-left-straight" aria-hidden="true"></span>
                 <span class="photo-tape tape-top-right-straight" aria-hidden="true"></span>
             <?php endif; ?>
-            <img 
-                src="<?= $imgFullUrl ?>" 
-                alt="<?= htmlspecialchars($post['title']) ?>" 
-                class="entry-photo loupe-clickable"
-                loading="lazy"
-                data-src="<?= $imgFullUrl ?>"
-                data-title="<?= htmlspecialchars($post['title']) ?>"
-                data-stamp="<?= htmlspecialchars($analogStamp) ?>"
-                data-exif="<?= htmlspecialchars($exifStr ?? '') ?>"
-                title="Klik for at åbne i lup (Fuld skærm)"
-            >
+            <?php if ($imgCount === 1): ?>
+                <img 
+                    src="<?= $imgFullUrl ?>" 
+                    alt="<?= htmlspecialchars($post['title']) ?>" 
+                    class="entry-photo loupe-clickable"
+                    loading="lazy"
+                    data-src="<?= $imgFullUrl ?>"
+                    data-title="<?= htmlspecialchars($post['title']) ?>"
+                    data-stamp="<?= htmlspecialchars($analogStamp) ?>"
+                    data-exif="<?= htmlspecialchars($exifStr ?? '') ?>"
+                    title="Klik for at åbne i lup (Fuld skærm)"
+                >
+            <?php else: ?>
+                <div class="entry-photo-grid count-<?= $imgCount ?>">
+                    <?php foreach ($postImages as $idx => $pImg):
+                        $pImgUrl = UPLOADS_URL . '/' . htmlspecialchars($pImg);
+                    ?>
+                        <div class="entry-photo-grid-item">
+                            <img 
+                                src="<?= $pImgUrl ?>" 
+                                alt="<?= htmlspecialchars($post['title']) ?> (<?= $idx + 1 ?>/<?= $imgCount ?>)" 
+                                class="entry-photo loupe-clickable"
+                                loading="lazy"
+                                data-src="<?= $pImgUrl ?>"
+                                data-title="<?= htmlspecialchars($post['title']) ?> (<?= $idx + 1 ?>/<?= $imgCount ?>)"
+                                data-stamp="<?= htmlspecialchars($analogStamp) ?>"
+                                data-exif="<?= htmlspecialchars($exifStr ?? '') ?>"
+                                title="Klik for at åbne i lup (Fuld skærm)"
+                            >
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
             <div class="entry-photo-caption-bar">
                 <?php if (!empty($exifStr)): ?>
                     <div class="entry-photo-exif" title="Kameradata (EXIF)">

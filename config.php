@@ -31,25 +31,33 @@ if (!headers_sent()) {
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: SAMEORIGIN');
     header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=(self)');
 }
 
-// URLs (justeres automatisk hvis logbogen ligger i en undermappe eller rod)
-$isHttps = (
-    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-    (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
-    (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') ||
-    (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
-);
-$protocol = $isHttps ? "https://" : "http://";
-$rawHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
-// Beskyt mod Host Header Injection – tillad kun gyldige domænetegn og evt. portnummer
-$host = preg_match('/^[a-zA-Z0-9.-]+(?::\d+)?$/', $rawHost) ? $rawHost : 'localhost';
-$scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
-$basePath = rtrim($scriptDir, '/');
-if (substr($basePath, -4) === '/app') {
-    $basePath = substr($basePath, 0, -4);
+// URLs (brug fast SITE_URL fra config.local.php hvis defineret – beskytter mod Host Header Injection)
+if (defined('SITE_URL') && SITE_URL !== '') {
+    $parsedSite = parse_url(rtrim(SITE_URL, '/'));
+    $basePath = rtrim($parsedSite['path'] ?? '', '/');
+    define('BASE_URL', rtrim(SITE_URL, '/'));
+} else {
+    $trustProxy = defined('TRUST_PROXY_HEADERS') && TRUST_PROXY_HEADERS === true;
+    $isHttps = (
+        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+        (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
+        ($trustProxy && !empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') ||
+        ($trustProxy && !empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
+    );
+    $protocol = $isHttps ? "https://" : "http://";
+    $rawHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    // Beskyt mod Host Header Injection – tillad kun gyldige domænetegn og evt. portnummer
+    $host = preg_match('/^[a-zA-Z0-9.-]+(?::\d+)?$/', $rawHost) ? $rawHost : 'localhost';
+    $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
+    $basePath = rtrim($scriptDir, '/');
+    if (substr($basePath, -4) === '/app') {
+        $basePath = substr($basePath, 0, -4);
+    }
+    define('BASE_URL', $protocol . $host . $basePath);
 }
-define('BASE_URL', $protocol . $host . $basePath);
 // UPLOADS_URL som rod-relativ URL (/uploads) så den aldrig blokeres af Mixed Content på HTTPS
 define('UPLOADS_URL', ($basePath ?: '') . '/uploads');
 

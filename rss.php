@@ -19,12 +19,15 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     <?php endif; ?>
 
     <?php foreach ($posts as $post): 
-        $uid = !empty($post['uid']) ? $post['uid'] : $post['id'];
-        $postUrl = BASE_URL . '/post.php?p=' . htmlspecialchars((string)$uid);
+        $postUrl = get_post_url($post);
         $pubDate = date(DATE_RSS, strtotime($post['published_at']));
-        $fullImgUrl = !empty($post['image_path']) ? (BASE_URL . '/uploads/' . htmlspecialchars($post['image_path'])) : '';
-        $imgTag = $fullImgUrl ? '<p><img src="' . $fullImgUrl . '" alt="' . htmlspecialchars($post['title']) . '" /></p>' : '';
-        $desc = $imgTag . render_content($post['content']);
+        $postImages = get_post_images((int)$post['id'], $post['image_path'] ?? null);
+        $imgTags = '';
+        foreach ($postImages as $pImg) {
+            $u = rtrim(BASE_URL, '/') . '/uploads/' . rawurlencode(basename($pImg));
+            $imgTags .= '<p><img src="' . htmlspecialchars($u) . '" alt="' . htmlspecialchars($post['title']) . '" /></p>';
+        }
+        $desc = $imgTags . render_content($post['content']);
         $exifStr = format_exif($post);
         if (!empty($exifStr)) {
             $desc .= '<p><small>⌀ ' . htmlspecialchars($exifStr) . '</small></p>';
@@ -32,15 +35,31 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
         if (!empty($post['location'])) {
             $desc .= '<p><em>⌖ ' . htmlspecialchars($post['location']) . '</em></p>';
         }
+        $postTags = get_post_tags((int)$post['id']);
+        $primaryFile = !empty($postImages[0]) ? UPLOADS_DIR . '/' . basename($postImages[0]) : '';
+        $primaryUrl = !empty($postImages[0]) ? rtrim(BASE_URL, '/') . '/uploads/' . rawurlencode(basename($postImages[0])) : '';
+        $enclosureMime = 'image/jpeg';
+        $enclosureLen = 0;
+        if ($primaryFile && is_file($primaryFile)) {
+            $enclosureLen = (int)filesize($primaryFile);
+            $imgInfo = @getimagesize($primaryFile);
+            if (!empty($imgInfo['mime'])) {
+                $enclosureMime = $imgInfo['mime'];
+            }
+        }
     ?>
       <item>
         <title><![CDATA[<?= format_analog_header($post['published_at'], $post['location'] ?? null) . ' ' . $post['title'] ?>]]></title>
         <link><?= htmlspecialchars($postUrl) ?></link>
         <guid isPermaLink="true"><?= htmlspecialchars($postUrl) ?></guid>
         <pubDate><?= $pubDate ?></pubDate>
+        <author><?= htmlspecialchars(SITE_AUTHOR) ?></author>
+        <?php foreach ($postTags as $t): ?>
+          <category><![CDATA[<?= $t['name'] ?>]]></category>
+        <?php endforeach; ?>
         <description><![CDATA[<?= $desc ?>]]></description>
-        <?php if ($fullImgUrl): ?>
-          <enclosure url="<?= $fullImgUrl ?>" type="image/jpeg" />
+        <?php if ($primaryUrl && $enclosureLen > 0): ?>
+          <enclosure url="<?= htmlspecialchars($primaryUrl) ?>" length="<?= $enclosureLen ?>" type="<?= htmlspecialchars($enclosureMime) ?>" />
         <?php endif; ?>
       </item>
     <?php endforeach; ?>

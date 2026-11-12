@@ -6,10 +6,11 @@
 require_once __DIR__ . '/db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
+    $trustProxy = defined('TRUST_PROXY_HEADERS') && TRUST_PROXY_HEADERS === true;
     $isSecure = (
         (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
         (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
-        (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+        ($trustProxy && !empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
     );
     session_set_cookie_params([
         'lifetime' => 0,
@@ -32,13 +33,13 @@ function get_client_ip(): string {
 }
 
 /**
- * Tjekker om IP-adressen (eller systemet globalt) er blokeret pga. for mange forkerte loginforsøg
+ * Tjekker om IP-adressen er midlertidigt blokeret pga. for mange forkerte loginforsøg
  */
 function is_ip_rate_limited(string $ip): array {
     $db = get_db();
     $lockoutSeconds = 900; // 15 minutter
 
-    // 1. Tjek specifik IP (maks 5 forsøg)
+    // Tjek specifik IP (maks 5 forsøg)
     $stmt = $db->prepare("SELECT attempts, last_attempt FROM login_attempts WHERE ip = :ip");
     $stmt->execute([':ip' => $ip]);
     $row = $stmt->fetch();
@@ -55,43 +56,15 @@ function is_ip_rate_limited(string $ip): array {
         }
     }
 
-    // 2. Tjek global grænse på tværs af IP'er (maks 15 fejlforsøg på 15 min mod distribueret brute-force)
-    $stmtGlobal = $db->prepare("SELECT attempts, last_attempt FROM login_attempts WHERE ip = '__global__'");
-    $stmtGlobal->execute();
-    $globalRow = $stmtGlobal->fetch();
-
-    if ($globalRow) {
-        $timeSinceGlobal = time() - (int)$globalRow['last_attempt'];
-        if ((int)$globalRow['attempts'] >= 15) {
-            if ($timeSinceGlobal < $lockoutSeconds) {
-                $waitMinutes = (int)ceil(($lockoutSeconds - $timeSinceGlobal) / 60);
-                return ['blocked' => true, 'wait_minutes' => $waitMinutes];
-            } else {
-                clear_failed_logins('__global__');
-            }
-        }
-    }
-
     return ['blocked' => false, 'wait_minutes' => 0];
 }
 
 /**
- * Registrerer et mislykket loginforsøg for både IP og globalt
+ * Registrerer et mislykket loginforsøg for IP-adressen
  */
 function record_failed_login(string $ip): int {
     $db = get_db();
     $now = time();
-
-    // Opdater global tæller
-    $stmtG = $db->prepare("SELECT attempts FROM login_attempts WHERE ip = '__global__'");
-    $stmtG->execute();
-    if ($stmtG->fetchColumn() !== false) {
-        $db->prepare("UPDATE login_attempts SET attempts = attempts + 1, last_attempt = :now WHERE ip = '__global__'")
-           ->execute([':now' => $now]);
-    } else {
-        $db->prepare("INSERT INTO login_attempts (ip, attempts, last_attempt) VALUES ('__global__', 1, :now)")
-           ->execute([':now' => $now]);
-    }
 
     // Opdater IP-tæller
     $stmt = $db->prepare("SELECT attempts FROM login_attempts WHERE ip = :ip");
@@ -195,7 +168,7 @@ function set_lockdown(bool $enabled): bool {
 
 /**
  * Validerer en indtastet PIN-kode.
- * VIGTIGT: Falder ALDRIG tilbage til DEFAULT_PIN, når der findes en PIN i databasen!
+ * VIGTIGT: Falder ALDRIG tilbage til DEFAULT_PIN!
  */
 function verify_pin(string $input_pin): bool {
     $db = get_db();
@@ -207,15 +180,14 @@ function verify_pin(string $input_pin): bool {
         return password_verify($input_pin, $row['value']);
     }
 
-    // Kun hvis settings-tabellen af uforklarlige årsager slet ikke har en 'pin'-række endnu
-    return hash_equals((string)DEFAULT_PIN, $input_pin);
+    return false;
 }
 
 /**
- * Opdaterer PIN-koden i databasen
+ * Opdaterer PIN-koden i databasen (kræver min. 6 tegn)
  */
 function update_pin(string $new_pin): bool {
-    if (strlen(trim($new_pin)) < 4) {
+    if (strlen(trim($new_pin)) < 6) {
         return false;
     }
     $db = get_db();
@@ -269,10 +241,11 @@ function validate_auth_token(?string $token): bool {
  * Sætter eller sletter logbog_token-cookien ensartet
  */
 function set_auth_cookie(string $token, int $expiresTimestamp): void {
+    $trustProxy = defined('TRUST_PROXY_HEADERS') && TRUST_PROXY_HEADERS === true;
     $isSecure = (
         (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
         (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
-        (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+        ($trustProxy && !empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
     );
     setcookie('logbog_token', $token, [
         'expires' => $expiresTimestamp,
@@ -284,7 +257,32 @@ function set_auth_cookie(string $token, int $expiresTimestamp): void {
 }
 
 /**
- * Tjekker om den aktuelle anmoder er logget ind (via session, cookie, header eller POST payload)
+ * Henter eller opretter et sessions-bundet CSRF-token
+ */
+function get_csrf_token(): string {
+    if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Validerer CSRF-token fra X-CSRF-Token header eller POST/JSON body
+ */
+function verify_csrf_token(?string $providedToken = null): bool {
+    $expected = $_SESSION['csrf_token'] ?? '';
+    if ($expected === '') {
+        return false;
+    }
+    $token = $providedToken ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    if ($token === '') {
+        return false;
+    }
+    return hash_equals($expected, (string)$token);
+}
+
+/**
+ * Tjekker om den aktuelle anmoder er logget ind (via session, HttpOnly-cookie eller Authorization Bearer)
  */
 function is_authenticated(): bool {
     // 1. Session check
@@ -294,6 +292,9 @@ function is_authenticated(): bool {
 
     // 2. Cookie check
     if (!empty($_COOKIE['logbog_token']) && validate_auth_token($_COOKIE['logbog_token'])) {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
         $_SESSION['logged_in'] = true;
         return true;
     }
@@ -307,18 +308,12 @@ function is_authenticated(): bool {
     if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
         $bearerToken = trim($matches[1]);
         if (validate_auth_token($bearerToken)) {
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_regenerate_id(true);
+            }
             $_SESSION['logged_in'] = true;
             return true;
         }
-    }
-
-    // 4. Token parameter i JSON body eller POST (GET-token tillades kun ved GET-requests)
-    global $input;
-    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-    $inputToken = $input['token'] ?? $_POST['token'] ?? ($method === 'GET' ? ($_GET['token'] ?? '') : '');
-    if (!empty($inputToken) && validate_auth_token((string)$inputToken)) {
-        $_SESSION['logged_in'] = true;
-        return true;
     }
 
     return false;

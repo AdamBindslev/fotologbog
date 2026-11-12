@@ -14,6 +14,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
 
 // Deaktiver fejlvisning i billed-output (fejl logges i stedet)
@@ -32,14 +33,21 @@ if (!$post || empty($post['image_path'])) {
     die('Indlæg eller billede ikke fundet');
 }
 
+$isAuthed = is_authenticated();
+if (($post['status'] ?? 'published') !== 'published' && !$isAuthed) {
+    http_response_code(404);
+    die('Indlæg eller billede ikke fundet');
+}
+
 $safeUid = !empty($post['uid']) ? $post['uid'] : (string)$post['id'];
 $safeUid = preg_replace('/[^a-zA-Z0-9_-]/', '', $safeUid);
 
-// Tilladte stilarter
+// Tilladte stilarter (offentlige besøgende får altid indlæggets valgte stil; kun admin kan previewe andre stilarter)
 $validStyles = ['polaroid', 'darkroom', 'notebook', 'raw'];
-$style = $_GET['style'] ?? ($post['og_style'] ?? 'polaroid');
+$defaultStyle = $post['og_style'] ?? 'notebook';
+$style = ($isAuthed && isset($_GET['style'])) ? $_GET['style'] : $defaultStyle;
 if (!in_array($style, $validStyles, true)) {
-    $style = 'polaroid';
+    $style = 'notebook';
 }
 
 $sourceFile = UPLOADS_DIR . '/' . basename($post['image_path']);
@@ -61,8 +69,8 @@ $scriptTime = filemtime(__FILE__);
 // Hvis enten indlæg, kildebillede eller genereringsscriptet er opdateret, regenereres kortet
 $refTime = max($postTime, $sourceTime, $scriptTime);
 
-// Tjek om gyldigt cachet billede allerede findes
-$noCache = isset($_GET['nocache']);
+// Tjek om gyldigt cachet billede allerede findes (kun autoriseret bruger kan tvinge nocache)
+$noCache = $isAuthed && isset($_GET['nocache']);
 if (!$noCache && is_file($cacheFile) && filemtime($cacheFile) >= $refTime) {
     send_image_file($cacheFile);
     exit;
@@ -418,8 +426,8 @@ function render_notebook_style($canvas, $srcImg, array $post, array $fonts): voi
     // Uddrag af logbogsnoterne (hvis udfyldt) – roligt og autentisk
     $rawContent = trim($post['content'] ?? '');
     if (!empty($rawContent)) {
-        // Fjern eventuel markdown formatering
-        $cleanNote = preg_replace('/[*_=#]/u', '', $rawContent);
+        // Fjern eventuel markdown formatering (inkl. ~rødt bånd~)
+        $cleanNote = preg_replace('/[*_=#~]/u', '', $rawContent);
         $cleanNote = preg_replace('/\s+/u', ' ', $cleanNote);
         $cleanNote = trim($cleanNote);
 

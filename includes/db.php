@@ -64,7 +64,8 @@ function init_db_schema(PDO $db): void {
             latitude REAL,
             longitude REAL,
             published_at DATETIME NOT NULL,
-            og_style TEXT DEFAULT 'polaroid',
+            status TEXT NOT NULL DEFAULT 'published',
+            og_style TEXT DEFAULT 'notebook',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -100,8 +101,41 @@ function init_db_schema(PDO $db): void {
         $db->exec("ALTER TABLE posts ADD COLUMN exif_camera TEXT");
     }
     if (!in_array('og_style', $existingCols)) {
-        $db->exec("ALTER TABLE posts ADD COLUMN og_style TEXT DEFAULT 'polaroid'");
+        $db->exec("ALTER TABLE posts ADD COLUMN og_style TEXT DEFAULT 'notebook'");
     }
+    if (!in_array('status', $existingCols)) {
+        $db->exec("ALTER TABLE posts ADD COLUMN status TEXT NOT NULL DEFAULT 'published'");
+    }
+    if (!in_array('exif_lens', $existingCols)) {
+        $db->exec("ALTER TABLE posts ADD COLUMN exif_lens TEXT");
+    }
+    if (!in_array('exif_film_sim', $existingCols)) {
+        $db->exec("ALTER TABLE posts ADD COLUMN exif_film_sim TEXT");
+    }
+    $db->exec("CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status)");
+
+    // Flere billeder pr. indlæg (diptykon / serie)
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS post_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            image_path TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_post_images_post ON post_images(post_id, sort_order);
+    ");
+
+    // Backfill eksisterende posts.image_path ind i post_images hvis de mangler
+    $db->exec("
+        INSERT INTO post_images (post_id, image_path, sort_order)
+        SELECT p.id, p.image_path, 0
+        FROM posts p
+        WHERE p.image_path IS NOT NULL
+          AND p.image_path != ''
+          AND NOT EXISTS (SELECT 1 FROM post_images pi WHERE pi.post_id = p.id)
+    ");
 
     // Tags & Post-Tags tabeller til emner
     $db->exec("

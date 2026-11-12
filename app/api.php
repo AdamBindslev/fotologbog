@@ -42,6 +42,16 @@ function require_post_method(): void {
     }
 }
 
+/**
+ * Sikrer gyldigt CSRF-token på muterende handlinger
+ */
+function require_csrf_token(array $input): void {
+    $provided = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($input['csrf_token'] ?? null);
+    if (!verify_csrf_token($provided)) {
+        json_reply(['error' => 'Ugyldigt eller manglende sikkerhedstoken (CSRF). Genindlæs appen og prøv igen.'], 403);
+    }
+}
+
 // -------------------------------------------------------------
 // Handlinger der IKKE kræver autentificering
 // -------------------------------------------------------------
@@ -69,7 +79,6 @@ if ($action === 'login') {
 
     if (verify_pin($pin)) {
         clear_failed_logins($clientIp);
-        clear_failed_logins('__global__');
 
         if (session_status() === PHP_SESSION_ACTIVE) {
             session_regenerate_id(true);
@@ -77,11 +86,12 @@ if ($action === 'login') {
 
         $token = generate_auth_token();
         $_SESSION['logged_in'] = true;
+        $csrfToken = get_csrf_token();
         set_auth_cookie($token, time() + (86400 * 365));
 
         json_reply([
             'success' => true,
-            'token' => $token,
+            'csrf_token' => $csrfToken,
             'message' => 'Login godkendt'
         ]);
     } else {
@@ -99,7 +109,11 @@ if ($action === 'login') {
 
 // 2. Tjek login-status
 if ($action === 'check_auth') {
-    json_reply(['authenticated' => is_authenticated()]);
+    $authed = is_authenticated();
+    json_reply([
+        'authenticated' => $authed,
+        'csrf_token' => $authed ? get_csrf_token() : null
+    ]);
 }
 
 // -------------------------------------------------------------
@@ -110,6 +124,7 @@ require_auth(true);
 // 3. Opret nyt indlæg
 if ($action === 'create_post') {
     require_post_method();
+    require_csrf_token($input);
 
     $title = trim((string)($input['title'] ?? ''));
     $content = trim((string)($input['content'] ?? ''));
@@ -117,39 +132,60 @@ if ($action === 'create_post') {
     $latitude = isset($input['latitude']) && is_numeric($input['latitude']) ? (float)$input['latitude'] : null;
     $longitude = isset($input['longitude']) && is_numeric($input['longitude']) ? (float)$input['longitude'] : null;
     $publishedAt = normalize_datetime_input($input['published_at'] ?? '');
+    $status = (($input['status'] ?? 'published') === 'draft') ? 'draft' : 'published';
 
     if (empty($title)) {
         $title = 'Log ' . date('d.m.Y', strtotime($publishedAt));
     }
 
-    // Billede kan komme som base64 (fra Canvas) eller $_FILES
-    $imageInput = null;
-    if (!empty($input['image_data'])) {
-        $imageInput = $input['image_data'];
+    // Billede(r) kan komme som images_data (array op til 3), image_data (base64) eller $_FILES
+    $rawImages = [];
+    if (!empty($input['images_data']) && is_array($input['images_data'])) {
+        $rawImages = array_slice($input['images_data'], 0, 3);
+    } elseif (!empty($input['image_data'])) {
+        $rawImages = [$input['image_data']];
     } elseif (!empty($_FILES['image'])) {
-        $imageInput = $_FILES['image'];
+        $rawImages = [$_FILES['image']];
     }
 
-    if (!$imageInput) {
-        json_reply(['error' => 'Du skal uploade et billede'], 400);
+    if (empty($rawImages)) {
+        json_reply(['error' => 'Du skal uploade mindst ét billede'], 400);
     }
 
+    $savedPaths = [];
     try {
-        $imagePath = save_image_data($imageInput);
+        foreach ($rawImages as $imgItem) {
+            if (!empty($imgItem)) {
+                $p = save_image_data($imgItem);
+                ensure_thumbnail($p);
+                $savedPaths[] = $p;
+            }
+        }
     } catch (Exception $e) {
+        foreach ($savedPaths as $sp) {
+            delete_uploaded_image($sp);
+        }
         json_reply(['error' => $e->getMessage()], 400);
     }
 
-    // Håndter EXIF-data (kan sendes fra app'en eller udtrækkes fra billedfil)
+    if (empty($savedPaths)) {
+        json_reply(['error' => 'Du skal uploade mindst ét gyldigt billede'], 400);
+    }
+    $imagePath = $savedPaths[0];
+
+    // Håndter EXIF-data (kan sendes fra app'en eller udtrækkes fra primær billedfil)
     $exifCamera = trim((string)($input['exif_camera'] ?? ''));
+    $exifLens = trim((string)($input['exif_lens'] ?? ''));
     $exifFocal = trim((string)($input['exif_focal'] ?? ''));
     $exifAperture = trim((string)($input['exif_aperture'] ?? ''));
     $exifShutter = trim((string)($input['exif_shutter'] ?? ''));
     $exifIso = trim((string)($input['exif_iso'] ?? ''));
+    $exifFilmSim = trim((string)($input['exif_film_sim'] ?? ''));
 
-    if (empty($exifCamera) && empty($exifFocal) && empty($exifAperture) && empty($exifShutter) && empty($exifIso)) {
+    if (empty($exifCamera) && empty($exifLens) && empty($exifFocal) && empty($exifAperture) && empty($exifShutter) && empty($exifIso)) {
         $extractedExif = extract_exif_from_image_file(UPLOADS_DIR . '/' . $imagePath);
         $exifCamera = $extractedExif['camera'] ?? null;
+        $exifLens = $extractedExif['lens'] ?? null;
         $exifFocal = $extractedExif['focal'] ?? null;
         $exifAperture = $extractedExif['aperture'] ?? null;
         $exifShutter = $extractedExif['shutter'] ?? null;
@@ -159,11 +195,11 @@ if ($action === 'create_post') {
     $slug = slugify($title);
     $db = get_db();
 
-    // Stil til Open Graph delingskort (polaroid, darkroom, notebook, raw)
+    // Stil til Open Graph delingskort (notebook er standard)
     $validStyles = ['polaroid', 'darkroom', 'notebook', 'raw'];
-    $ogStyle = trim((string)($input['og_style'] ?? 'polaroid'));
+    $ogStyle = trim((string)($input['og_style'] ?? 'notebook'));
     if (!in_array($ogStyle, $validStyles, true)) {
-        $ogStyle = 'polaroid';
+        $ogStyle = 'notebook';
     }
 
     // Generer et unikt, ikke-fortløbende UID til permalinks
@@ -177,12 +213,12 @@ if ($action === 'create_post') {
 
     $stmt = $db->prepare("
         INSERT INTO posts (
-            uid, title, slug, content, image_path, location, latitude, longitude, published_at,
-            og_style, exif_camera, exif_focal, exif_aperture, exif_shutter, exif_iso, created_at, updated_at
+            uid, title, slug, content, image_path, location, latitude, longitude, published_at, status,
+            og_style, exif_camera, exif_lens, exif_focal, exif_aperture, exif_shutter, exif_iso, exif_film_sim, created_at, updated_at
         )
         VALUES (
-            :uid, :title, :slug, :content, :image_path, :location, :latitude, :longitude, :published_at,
-            :og_style, :exif_camera, :exif_focal, :exif_aperture, :exif_shutter, :exif_iso, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            :uid, :title, :slug, :content, :image_path, :location, :latitude, :longitude, :published_at, :status,
+            :og_style, :exif_camera, :exif_lens, :exif_focal, :exif_aperture, :exif_shutter, :exif_iso, :exif_film_sim, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
     ");
 
@@ -196,16 +232,20 @@ if ($action === 'create_post') {
         ':latitude' => $latitude,
         ':longitude' => $longitude,
         ':published_at' => $publishedAt,
+        ':status' => $status,
         ':og_style' => $ogStyle,
         ':exif_camera' => $exifCamera ?: null,
+        ':exif_lens' => $exifLens ?: null,
         ':exif_focal' => $exifFocal ?: null,
         ':exif_aperture' => $exifAperture ?: null,
         ':exif_shutter' => $exifShutter ?: null,
-        ':exif_iso' => $exifIso ?: null
+        ':exif_iso' => $exifIso ?: null,
+        ':exif_film_sim' => $exifFilmSim ?: null
     ]);
 
     if ($success) {
         $newId = (int)$db->lastInsertId();
+        set_post_images($newId, $savedPaths);
 
         // Gem tags hvis angivet (array eller kommasepareret streng)
         $tagsInput = $input['tags'] ?? [];
@@ -220,8 +260,9 @@ if ($action === 'create_post') {
             'success' => true,
             'id' => $newId,
             'uid' => $uid,
-            'message' => 'Indlæg oprettet!',
-            'post_url' => BASE_URL . '/post.php?p=' . $uid
+            'status' => $status,
+            'message' => $status === 'draft' ? 'Kladde gemt!' : 'Indlæg oprettet!',
+            'post_url' => get_post_url($uid)
         ]);
     } else {
         json_reply(['error' => 'Kunne ikke gemme indlægget i databasen'], 500);
@@ -239,6 +280,7 @@ if ($action === 'get_posts') {
 
     foreach ($posts as &$p) {
         $p['tags'] = get_post_tags((int)$p['id']);
+        $p['images'] = get_post_images((int)$p['id'], $p['image_path'] ?? null);
         $p['exif_formatted'] = format_exif($p);
     }
     unset($p);
@@ -277,6 +319,7 @@ if ($action === 'get_post') {
     $post = get_post_by_id($id);
     if ($post) {
         $post['tags'] = get_post_tags($id);
+        $post['images'] = get_post_images($id, $post['image_path'] ?? null);
         $post['exif_formatted'] = format_exif($post);
         json_reply(['post' => $post]);
     } else {
@@ -293,6 +336,7 @@ if ($action === 'get_tags') {
 // 6. Opdater et eksisterende indlæg
 if ($action === 'update_post') {
     require_post_method();
+    require_csrf_token($input);
 
     $id = (int)($input['id'] ?? 0);
     $post = get_post_by_id($id);
@@ -306,25 +350,61 @@ if ($action === 'update_post') {
     $publishedAt = normalize_datetime_input($input['published_at'] ?? $post['published_at']);
     $latitude = isset($input['latitude']) && is_numeric($input['latitude']) ? (float)$input['latitude'] : $post['latitude'];
     $longitude = isset($input['longitude']) && is_numeric($input['longitude']) ? (float)$input['longitude'] : $post['longitude'];
+    $status = isset($input['status']) ? (($input['status'] === 'draft') ? 'draft' : 'published') : ($post['status'] ?? 'published');
 
-    $imagePath = $post['image_path'];
-    if (!empty($input['image_data'])) {
+    $currentImages = get_post_images($id, $post['image_path'] ?? null);
+    $finalImages = $currentImages;
+
+    if (isset($input['existing_images']) && is_array($input['existing_images'])) {
+        $kept = [];
+        foreach ($input['existing_images'] as $ex) {
+            $b = basename((string)$ex);
+            if (in_array($b, $currentImages, true) && !in_array($b, $kept, true)) {
+                $kept[] = $b;
+            }
+        }
+        $finalImages = $kept;
+    }
+
+    if (!empty($input['images_data']) && is_array($input['images_data'])) {
+        foreach ($input['images_data'] as $imgData) {
+            if (count($finalImages) >= 3) break;
+            if (!empty($imgData)) {
+                try {
+                    $newPath = save_image_data($imgData);
+                    ensure_thumbnail($newPath);
+                    $finalImages[] = $newPath;
+                } catch (Exception $e) {
+                    json_reply(['error' => 'Kunne ikke gemme nyt billede: ' . $e->getMessage()], 400);
+                }
+            }
+        }
+    } elseif (!empty($input['image_data'])) {
         try {
             $newImagePath = save_image_data($input['image_data']);
-            // Slet den gamle billedfil, når det nye er gemt
-            if (!empty($post['image_path']) && $post['image_path'] !== $newImagePath) {
-                delete_uploaded_image($post['image_path']);
-            }
-            $imagePath = $newImagePath;
+            ensure_thumbnail($newImagePath);
+            $finalImages = [$newImagePath];
         } catch (Exception $e) {
             json_reply(['error' => 'Kunne ikke gemme nyt billede: ' . $e->getMessage()], 400);
         }
     }
 
+    if (empty($finalImages)) {
+        json_reply(['error' => 'Et indlæg skal have mindst ét billede'], 400);
+    }
+
+    // Slet billedfiler der blev fjernet
+    foreach ($currentImages as $oldImg) {
+        if (!in_array($oldImg, $finalImages, true)) {
+            delete_uploaded_image($oldImg);
+        }
+    }
+    $imagePath = $finalImages[0];
+
     $validStyles = ['polaroid', 'darkroom', 'notebook', 'raw'];
-    $ogStyle = isset($input['og_style']) ? trim((string)$input['og_style']) : ($post['og_style'] ?? 'polaroid');
+    $ogStyle = isset($input['og_style']) ? trim((string)$input['og_style']) : ($post['og_style'] ?? 'notebook');
     if (!in_array($ogStyle, $validStyles, true)) {
-        $ogStyle = $post['og_style'] ?? 'polaroid';
+        $ogStyle = $post['og_style'] ?? 'notebook';
     }
 
     $db = get_db();
@@ -336,6 +416,7 @@ if ($action === 'update_post') {
             latitude = :latitude, 
             longitude = :longitude, 
             published_at = :published_at, 
+            status = :status,
             image_path = :image_path,
             og_style = :og_style,
             updated_at = CURRENT_TIMESTAMP
@@ -349,10 +430,13 @@ if ($action === 'update_post') {
         ':latitude' => $latitude,
         ':longitude' => $longitude,
         ':published_at' => $publishedAt,
+        ':status' => $status,
         ':image_path' => $imagePath,
         ':og_style' => $ogStyle,
         ':id' => $id
     ]);
+
+    set_post_images($id, $finalImages);
 
     // Ryd eventuelt cached Open Graph billede, så det opdateres med de nye data
     delete_og_image_cache($post['uid'] ?? (string)$id);
@@ -371,27 +455,33 @@ if ($action === 'update_post') {
     // Opdater EXIF hvis sendt med
     if (
         isset($input['exif_camera']) ||
+        isset($input['exif_lens']) ||
         isset($input['exif_focal']) ||
         isset($input['exif_aperture']) ||
         isset($input['exif_shutter']) ||
-        isset($input['exif_iso'])
+        isset($input['exif_iso']) ||
+        isset($input['exif_film_sim'])
     ) {
         $exifCamera = trim((string)($input['exif_camera'] ?? ($post['exif_camera'] ?? '')));
+        $exifLens = trim((string)($input['exif_lens'] ?? ($post['exif_lens'] ?? '')));
         $exifFocal = trim((string)($input['exif_focal'] ?? ($post['exif_focal'] ?? '')));
         $exifAperture = trim((string)($input['exif_aperture'] ?? ($post['exif_aperture'] ?? '')));
         $exifShutter = trim((string)($input['exif_shutter'] ?? ($post['exif_shutter'] ?? '')));
         $exifIso = trim((string)($input['exif_iso'] ?? ($post['exif_iso'] ?? '')));
+        $exifFilmSim = trim((string)($input['exif_film_sim'] ?? ($post['exif_film_sim'] ?? '')));
         $stmtExif = $db->prepare("
             UPDATE posts 
-            SET exif_camera = :cam, exif_focal = :foc, exif_aperture = :ap, exif_shutter = :sh, exif_iso = :iso 
+            SET exif_camera = :cam, exif_lens = :lens, exif_focal = :foc, exif_aperture = :ap, exif_shutter = :sh, exif_iso = :iso, exif_film_sim = :fsim 
             WHERE id = :id
         ");
         $stmtExif->execute([
             ':cam' => $exifCamera ?: null,
+            ':lens' => $exifLens ?: null,
             ':foc' => $exifFocal ?: null,
             ':ap' => $exifAperture ?: null,
             ':sh' => $exifShutter ?: null,
             ':iso' => $exifIso ?: null,
+            ':fsim' => $exifFilmSim ?: null,
             ':id' => $id
         ]);
     }
@@ -402,6 +492,7 @@ if ($action === 'update_post') {
 // 7. Slet et indlæg
 if ($action === 'delete_post') {
     require_post_method();
+    require_csrf_token($input);
 
     $id = (int)($input['id'] ?? 0);
     $post = get_post_by_id($id);
@@ -409,8 +500,11 @@ if ($action === 'delete_post') {
         json_reply(['error' => 'Indlægget findes ikke'], 404);
     }
 
-    // Slet billedfilen sikkert
-    delete_uploaded_image($post['image_path'] ?? null);
+    // Slet alle billedfiler tilhørende indlægget sikkert
+    $allImgs = get_post_images($id, $post['image_path'] ?? null);
+    foreach ($allImgs as $imgP) {
+        delete_uploaded_image($imgP);
+    }
     delete_og_image_cache($post['uid'] ?? (string)$id);
 
     $db = get_db();
@@ -426,13 +520,18 @@ if ($action === 'delete_post') {
     json_reply(['success' => true, 'message' => 'Indlægget er slettet']);
 }
 
-// 8. Opdater PIN-kode (og ugyldiggør gamle tokens på andre enheder)
+// 8. Opdater PIN-kode (kræver nuværende PIN og mindst 6 tegn)
 if ($action === 'update_pin') {
     require_post_method();
+    require_csrf_token($input);
 
+    $currentPin = trim((string)($input['current_pin'] ?? ''));
     $newPin = trim((string)($input['new_pin'] ?? ''));
-    if (strlen($newPin) < 4) {
-        json_reply(['error' => 'Ny PIN-kode skal være på mindst 4 tegn'], 400);
+    if (empty($currentPin) || !verify_pin($currentPin)) {
+        json_reply(['error' => 'Nuværende PIN-kode er forkert'], 403);
+    }
+    if (strlen($newPin) < 6) {
+        json_reply(['error' => 'Ny PIN-kode skal være på mindst 6 tegn'], 400);
     }
 
     try {
@@ -442,7 +541,7 @@ if ($action === 'update_pin') {
             set_auth_cookie($freshToken, time() + (86400 * 365));
             json_reply([
                 'success' => true,
-                'token' => $freshToken,
+                'csrf_token' => get_csrf_token(),
                 'message' => 'PIN-koden er ændret, og gamle sessioner er nulstillet'
             ]);
         } else {
@@ -457,6 +556,7 @@ if ($action === 'update_pin') {
 // 9. Download backup af SQLite database
 if ($action === 'backup') {
     require_post_method();
+    require_csrf_token($input);
 
     if (!file_exists(DB_PATH)) {
         json_reply(['error' => 'Databasen er ikke fundet'], 404);
@@ -478,6 +578,7 @@ if ($action === 'get_settings') {
 // 11. Slå Lockdown til/fra
 if ($action === 'toggle_lockdown') {
     require_post_method();
+    require_csrf_token($input);
 
     $current = is_lockdown_enabled();
     $newStatus = !$current;
@@ -492,12 +593,13 @@ if ($action === 'toggle_lockdown') {
 // 12. Log alle andre enheder ud (roter token-nøgle, men behold aktuel enhed)
 if ($action === 'revoke_sessions') {
     require_post_method();
+    require_csrf_token($input);
     revoke_all_tokens();
     $freshToken = generate_auth_token();
     set_auth_cookie($freshToken, time() + (86400 * 365));
     json_reply([
         'success' => true,
-        'token' => $freshToken,
+        'csrf_token' => get_csrf_token(),
         'message' => 'Alle andre enheder og tidligere tokens er nu logget ud.'
     ]);
 }
@@ -505,6 +607,7 @@ if ($action === 'revoke_sessions') {
 // 13. Log ud
 if ($action === 'logout') {
     require_post_method();
+    require_csrf_token($input);
 
     $_SESSION = [];
     if (session_id()) {

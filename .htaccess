@@ -16,6 +16,9 @@ AddDefaultCharset UTF-8
 
     # Beskyt følsomme filer og mapper
     RewriteRule ^data/ - [F,L]
+    RewriteRule ^includes/ - [F,L]
+    RewriteRule ^scripts/ - [F,L]
+    RewriteRule ^config(\.local)?\.php$ - [F,L]
     RewriteRule \.(db|sqlite|sqlite3|env|git.*|md)$ - [F,L]
 
     # Venlige genveje
