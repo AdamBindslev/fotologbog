@@ -218,7 +218,7 @@ $nextPost = $adjacent['next'];
                             $prevUid = !empty($prevPost['uid']) ? $prevPost['uid'] : $prevPost['id'];
                         ?>
                             <a href="<?= htmlspecialchars(BASE_URL) ?>/post.php?p=<?= urlencode((string)$prevUid) ?>" id="prevPostLink" class="post-nav-card" title="<?= htmlspecialchars($prevPost['title']) ?>">
-                                <span class="post-nav-dir">← [ FORRIGE OPTAGELSE ]</span>
+                                <span class="post-nav-dir">← [ FORRIGE OPTEGNELSE ]</span>
                                 <span class="post-nav-meta"><?= format_analog_date($prevPost['published_at']) ?> · <?= htmlspecialchars($prevPost['title']) ?></span>
                             </a>
                         <?php endif; ?>
@@ -231,7 +231,7 @@ $nextPost = $adjacent['next'];
                             $nextUid = !empty($nextPost['uid']) ? $nextPost['uid'] : $nextPost['id'];
                         ?>
                             <a href="<?= htmlspecialchars(BASE_URL) ?>/post.php?p=<?= urlencode((string)$nextUid) ?>" id="nextPostLink" class="post-nav-card" title="<?= htmlspecialchars($nextPost['title']) ?>">
-                                <span class="post-nav-dir">[ NÆSTE OPTAGELSE ] →</span>
+                                <span class="post-nav-dir">[ NÆSTE OPTEGNELSE ] →</span>
                                 <span class="post-nav-meta"><?= format_analog_date($nextPost['published_at']) ?> · <?= htmlspecialchars($nextPost['title']) ?></span>
                             </a>
                         <?php endif; ?>

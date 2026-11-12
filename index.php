@@ -120,7 +120,7 @@ function render_contact_sheet_grid(array $sheet, array $monthNames, bool $linkTo
                         <?php endif; ?>
                     </a>
                 <?php else: ?>
-                    <div class="contact-cell contact-cell-empty <?= $dInfo['is_future'] ? 'is-future' : '' ?> <?= $dInfo['is_today'] ? 'is-today' : '' ?>" aria-label="<?= htmlspecialchars($dInfo['date_label']) ?> – ingen optagelse">
+                    <div class="contact-cell contact-cell-empty <?= $dInfo['is_future'] ? 'is-future' : '' ?> <?= $dInfo['is_today'] ? 'is-today' : '' ?>" aria-label="<?= htmlspecialchars($dInfo['date_label']) ?> – ingen optegnelse">
                         <span class="contact-day-num"><?= $dayStr ?></span>
                         <span class="contact-empty-mark" aria-hidden="true"><?= $dInfo['is_future'] ? '·' : '—' ?></span>
                     </div>
@@ -304,7 +304,7 @@ $ogTitle = !empty($activeFilterTitle) ? ($activeFilterTitle . ' – ' . SITE_TIT
                 <?php if (empty($indexItems)): ?>
                     <div class="index-empty-state">
                         <p>[ INGEN EMNER ELLER LOKATIONER ARKIVERET ENDNU ]</p>
-                        <p style="margin-top: 0.5rem; font-size: 0.95rem;">Emner og lokationer fra logbogens optagelser samles automatisk i dette register.</p>
+                        <p style="margin-top: 0.5rem; font-size: 0.95rem;">Emner og lokationer fra logbogens optegnelser samles automatisk i dette register.</p>
                     </div>
                 <?php else: ?>
                     <div class="index-cloud-area">
@@ -362,7 +362,7 @@ $ogTitle = !empty($activeFilterTitle) ? ($activeFilterTitle . ' – ' . SITE_TIT
                         <p style="margin-top: 0.5rem; font-size: 0.9rem;">Der blev ikke fundet nogen indlæg under <?= htmlspecialchars($activeFilterTitle) ?>.</p>
                         <a href="<?= htmlspecialchars(BASE_URL) ?>/">Gå til forsiden</a>
                     <?php else: ?>
-                        <p style="margin-top: 0.5rem; font-size: 0.9rem;">Logbogen afventer sin første optagelse.</p>
+                        <p style="margin-top: 0.5rem; font-size: 0.9rem;">Logbogen afventer sin første optegnelse.</p>
                     <?php endif; ?>
                 </div>
             <?php else: ?>
