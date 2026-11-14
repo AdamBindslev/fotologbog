@@ -212,6 +212,25 @@ function init_db_schema(PDO $db): void {
         );
     ");
 
+    // Private postkort / stille nik fra besøgende (vises kun for fotografen i /app/)
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS postcards (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'nod',
+            sender_name TEXT,
+            sender_contact TEXT,
+            message TEXT,
+            ip_hash TEXT,
+            is_read INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_postcards_created ON postcards(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_postcards_unread ON postcards(is_read);
+        CREATE INDEX IF NOT EXISTS idx_postcards_rate ON postcards(ip_hash, created_at);
+    ");
+
     // Sæt standard PIN i settings hvis den ikke findes
     $stmt = $db->prepare("SELECT value FROM settings WHERE key = 'pin'");
     $stmt->execute();

@@ -1174,3 +1174,25 @@ function extract_exif_from_image_file(string $filePath): array {
 
     return $result;
 }
+
+/**
+ * Udskriver den diskrete kolofon i bunden af notesbogen
+ */
+function render_colophon(): void {
+    $rssUrl = htmlspecialchars(BASE_URL . '/rss.php', ENT_QUOTES, 'UTF-8');
+    $repoUrl = defined('COLOPHON_REPO_URL') ? trim((string)COLOPHON_REPO_URL) : '';
+    ?>
+    <footer class="notebook-colophon" aria-label="Kolofon">
+        <p class="colophon-ethos">
+            Udgivet uden offentlige likes, algoritmer eller følgere — for glæden ved at se og skabe hver dag.
+        </p>
+        <p class="colophon-links">
+            <a href="<?= $rssUrl ?>" title="Abonnér via RSS">[ RSS FEED ]</a>
+            <?php if ($repoUrl !== ''): ?>
+                <span class="colophon-sep" aria-hidden="true">·</span>
+                <a href="<?= htmlspecialchars($repoUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">Bygget på Logbog — start din egen →</a>
+            <?php endif; ?>
+        </p>
+    </footer>
+    <?php
+}

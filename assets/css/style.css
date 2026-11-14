@@ -1806,3 +1806,233 @@ body {
     margin-bottom: 1.25rem;
     text-align: center;
 }
+
+/* Diskret postkort-link på feed-kort */
+.meta-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.entry-postcard-link,
+.entry-postcard-link:visited {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--ink-dark);
+    background: var(--sheet-paper-tint);
+    border: 1.5px solid var(--ink-black);
+    padding: 3px 8px;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.entry-postcard-link:hover,
+.entry-postcard-link:focus-visible {
+    background: var(--ink-black);
+    color: var(--sheet-paper);
+    outline: none;
+}
+
+/* Privat Postkort-boks på enkeltside (ligner et fysisk postkort/kartotekskort) */
+.postcard-box {
+    margin: 2rem 0 1.75rem;
+    padding: 1.4rem 1.6rem;
+    background: var(--sheet-paper);
+    border: 2px solid var(--ink-black);
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+}
+
+.postcard-stamp {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--ink-red);
+    margin-bottom: 0.5rem;
+}
+
+.postcard-intro {
+    font-family: var(--font-serif);
+    font-size: 0.94rem;
+    line-height: 1.55;
+    color: var(--ink-muted);
+    margin: 0 0 1rem;
+}
+
+.postcard-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.postcard-btn {
+    background: var(--sheet-paper-tint);
+    border: 1.5px solid var(--ink-black);
+    color: var(--ink-black);
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 9px 14px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.postcard-btn:hover:not(:disabled),
+.postcard-btn:focus-visible:not(:disabled) {
+    background: var(--ink-black);
+    color: var(--sheet-paper);
+    outline: none;
+}
+
+.postcard-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.postcard-btn-submit {
+    border-color: var(--ink-red);
+    color: var(--ink-red);
+    background: var(--sheet-paper);
+}
+
+.postcard-btn-submit:hover:not(:disabled),
+.postcard-btn-submit:focus-visible:not(:disabled) {
+    background: var(--ink-red);
+    color: var(--sheet-paper);
+    border-color: var(--ink-red);
+}
+
+.postcard-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 1.1rem;
+    padding-top: 1.1rem;
+    border-top: 1px dashed var(--sheet-border);
+}
+
+.postcard-honeypot {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.postcard-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+@media (max-width: 600px) {
+    .postcard-row {
+        grid-template-columns: 1fr;
+    }
+    .postcard-box {
+        padding: 1.1rem 1.15rem;
+    }
+}
+
+.postcard-input,
+.postcard-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--sheet-paper-tint);
+    border: 1.5px solid var(--sheet-border);
+    color: var(--ink-dark);
+    font-family: var(--font-typewriter);
+    font-size: 0.85rem;
+    padding: 9px 11px;
+}
+
+.postcard-input:focus,
+.postcard-textarea:focus {
+    outline: none;
+    border-color: var(--ink-black);
+    background: var(--sheet-paper);
+}
+
+.postcard-form-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.postcard-privacy-note {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+}
+
+.postcard-feedback {
+    margin-top: 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    padding: 9px 12px;
+    border: 1.5px solid var(--sheet-border);
+    background: var(--sheet-paper-tint);
+}
+
+.postcard-feedback.is-success {
+    border-color: #2f5238;
+    color: #2f5238;
+    background: #eef5ef;
+}
+
+.postcard-feedback.is-error {
+    border-color: var(--ink-red);
+    color: var(--ink-red);
+    background: var(--ink-red-faint);
+}
+
+/* Diskret kolofon på kraft-omslaget i bunden af notesbogen */
+.notebook-colophon {
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px dashed rgba(251, 247, 238, 0.35);
+    text-align: center;
+}
+
+.colophon-ethos {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 0.88rem;
+    color: rgba(251, 247, 238, 0.88);
+    margin: 0 0 0.5rem;
+}
+
+.colophon-links {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: rgba(251, 247, 238, 0.75);
+    margin: 0;
+}
+
+.colophon-links a,
+.colophon-links a:visited {
+    color: var(--sheet-paper);
+    text-decoration: none;
+    border-bottom: 1px dotted rgba(251, 247, 238, 0.55);
+    padding-bottom: 1px;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.colophon-links a:hover,
+.colophon-links a:focus-visible {
+    border-bottom-color: var(--sheet-paper);
+    outline: none;
+}
+
+.colophon-sep {
+    margin: 0 8px;
+}

@@ -132,10 +132,13 @@ $analogStamp = format_analog_header($post['published_at'], $post['location'] ?? 
                     <span class="meta-theme">THEME &amp; NOTE</span>
                 <?php endif; ?>
             </div>
-            <a href="<?= $postUrl ?>" class="entry-stamp-badge" title="Permanent link">
-                <span class="stamp-icon">REF</span>
-                <span class="stamp-code"><?= htmlspecialchars($uid) ?></span>
-            </a>
+            <div class="meta-actions-right">
+                <a href="<?= $postUrl ?>#postkort" class="entry-postcard-link" title="Send et stille nik eller privat postkort">[ ✉ POSTKORT ]</a>
+                <a href="<?= $postUrl ?>" class="entry-stamp-badge" title="Permanent link">
+                    <span class="stamp-icon">REF</span>
+                    <span class="stamp-code"><?= htmlspecialchars($uid) ?></span>
+                </a>
+            </div>
         </div>
     </footer>
 </article>

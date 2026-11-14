@@ -166,7 +166,7 @@ $ogTitle = !empty($activeFilterTitle) ? ($activeFilterTitle . ' – ' . SITE_TIT
 
     <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars(BASE_URL) ?>/assets/icons/favicon.svg">
     <link rel="apple-touch-icon" href="<?= htmlspecialchars(BASE_URL) ?>/assets/icons/icon-192.png">
-    <link rel="stylesheet" href="<?= htmlspecialchars(BASE_URL) ?>/assets/css/style.css">
+    <link rel="stylesheet" href="<?= htmlspecialchars(BASE_URL) ?>/assets/css/style.css?v=<?= @filemtime(__DIR__ . '/assets/css/style.css') ?: '1' ?>">
     <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars(SITE_TITLE) ?> RSS Feed" href="<?= htmlspecialchars(BASE_URL) ?>/rss.php">
 
     <?php if (defined('COUNTER_DEV_ID') && COUNTER_DEV_ID !== ''): ?>
@@ -399,6 +399,7 @@ $ogTitle = !empty($activeFilterTitle) ? ($activeFilterTitle . ' – ' . SITE_TIT
 
             <?php endif; ?>
         <?php endif; ?>
+        <?php render_colophon(); ?>
             </main>
 
         </div><!-- /.notebook-content -->

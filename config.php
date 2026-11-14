@@ -20,6 +20,9 @@ if (!defined('SITE_DESCRIPTION')) define('SITE_DESCRIPTION', 'Daglig visuel foto
 // Valgfri statistik (f.eks. Counter.dev data-id – lad stå tom for ingen tracking)
 if (!defined('COUNTER_DEV_ID')) define('COUNTER_DEV_ID', '');
 
+// Link til projektets kildekode i sidens diskrete kolofon (lad stå tom for at skjule)
+if (!defined('COLOPHON_REPO_URL')) define('COLOPHON_REPO_URL', 'https://github.com/AdamBindslev/fotologbog');
+
 // Stier på serveren
 define('BASE_DIR', __DIR__);
 define('DATA_DIR', BASE_DIR . '/data');

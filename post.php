@@ -64,7 +64,7 @@ $nextPost = $adjacent['next'];
 
     <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars(BASE_URL) ?>/assets/icons/favicon.svg">
     <link rel="apple-touch-icon" href="<?= htmlspecialchars(BASE_URL) ?>/assets/icons/icon-192.png">
-    <link rel="stylesheet" href="<?= htmlspecialchars(BASE_URL) ?>/assets/css/style.css">
+    <link rel="stylesheet" href="<?= htmlspecialchars(BASE_URL) ?>/assets/css/style.css?v=<?= @filemtime(__DIR__ . '/assets/css/style.css') ?: '1' ?>">
     <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars(SITE_TITLE) ?> RSS Feed" href="<?= htmlspecialchars(BASE_URL) ?>/rss.php">
 
     <?php if (defined('COUNTER_DEV_ID') && COUNTER_DEV_ID !== ''): ?>
@@ -226,10 +226,6 @@ $nextPost = $adjacent['next'];
                                     <span class="meta-theme">COMBINATION THEME AND NOTE BOOK</span>
                                 <?php endif; ?>
                             </div>
-                            <div class="entry-share-actions">
-                                <button type="button" class="share-btn" id="copyPostLinkBtn" data-url="<?= htmlspecialchars($postUrl) ?>">[ KOPIÉR LINK ]</button>
-                                <button type="button" class="share-btn" id="nativeShareBtn" data-url="<?= htmlspecialchars($postUrl) ?>" data-title="<?= htmlspecialchars($post['title']) ?>" style="display:none;">[ DEL ]</button>
-                            </div>
                             <div class="entry-stamp-badge">
                                 <span class="stamp-icon">REF</span>
                                 <span class="stamp-code"><?= htmlspecialchars($uid) ?></span>
@@ -237,6 +233,41 @@ $nextPost = $adjacent['next'];
                         </div>
                     </footer>
                 </article>
+
+                <!-- Privat postkort / stille nik (ingen offentlige tællere) -->
+                <section id="postkort" class="postcard-box" aria-label="Send et privat postkort">
+                    <div class="postcard-header">
+                        <span class="postcard-stamp">[ PRIVAT POSTKORT ]</span>
+                        <p class="postcard-intro">
+                            Ingen offentlige likes eller kommentarspor — men hvis billedet ramte noget i dig, kan du sende et stille nik eller en kort hilsen direkte til fotografens private indbakke.
+                        </p>
+                    </div>
+                    <div class="postcard-actions" id="postcardActions">
+                        <button type="button" class="postcard-btn postcard-btn-nod" id="sendNodBtn" data-post-id="<?= (int)$post['id'] ?>">
+                            [ ♡ SEND ET STILLE NIK ]
+                        </button>
+                        <button type="button" class="postcard-btn postcard-btn-toggle" id="togglePostcardFormBtn">
+                            [ ✉ SKRIV ET POSTKORT ]
+                        </button>
+                    </div>
+                    <form id="postcardForm" class="postcard-form" style="display: none;" novalidate>
+                        <input type="hidden" name="post_id" value="<?= (int)$post['id'] ?>">
+                        <div class="postcard-honeypot" aria-hidden="true">
+                            <label for="pcWebsite">Website</label>
+                            <input type="text" id="pcWebsite" name="website" tabindex="-1" autocomplete="off">
+                        </div>
+                        <div class="postcard-row">
+                            <input type="text" id="pcName" name="sender_name" maxlength="80" class="postcard-input" placeholder="Dit navn (valgfrit)">
+                            <input type="text" id="pcContact" name="sender_contact" maxlength="120" class="postcard-input" placeholder="E-mail / @ / site (valgfrit, hvis du vil have svar)">
+                        </div>
+                        <textarea id="pcMessage" name="message" maxlength="1000" rows="3" class="postcard-textarea" placeholder="Skriv en kort hilsen om billedet eller dagen..."></textarea>
+                        <div class="postcard-form-footer">
+                            <span class="postcard-privacy-note">Kun synligt for fotografen.</span>
+                            <button type="submit" class="postcard-btn postcard-btn-submit" id="submitPostcardBtn">[ SEND PRIVAT POSTKORT ]</button>
+                        </div>
+                    </form>
+                    <div id="postcardFeedback" class="postcard-feedback" role="status" aria-live="polite" style="display: none;"></div>
+                </section>
 
                 <!-- Bladring mellem dage i logbogen -->
                 <nav class="single-post-nav" aria-label="Bladr i logbogen">
@@ -260,6 +291,7 @@ $nextPost = $adjacent['next'];
                         <?php endif; ?>
                     </div>
                 </nav>
+                <?php render_colophon(); ?>
             </main>
 
         </div><!-- /.notebook-content -->
@@ -361,6 +393,8 @@ if (document.readyState === 'complete') {
             return;
         }
         if (lb && lb.classList.contains('active')) return;
+        const activeTag = document.activeElement ? document.activeElement.tagName : '';
+        if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
         if (e.key === 'ArrowLeft') {
             const prev = document.getElementById('prevPostLink');
             if (prev) window.location.href = prev.href;
@@ -370,34 +404,112 @@ if (document.readyState === 'complete') {
         }
     });
 
-    // Diskret link-kopiering & native deling
-    const copyBtn = document.getElementById('copyPostLinkBtn');
-    const shareBtn = document.getElementById('nativeShareBtn');
-    if (copyBtn) {
-        copyBtn.addEventListener('click', async () => {
-            const url = copyBtn.getAttribute('data-url');
+    // Privat postkort & stille nik
+    const nodBtn = document.getElementById('sendNodBtn');
+    const toggleFormBtn = document.getElementById('togglePostcardFormBtn');
+    const pcForm = document.getElementById('postcardForm');
+    const pcActions = document.getElementById('postcardActions');
+    const pcFeedback = document.getElementById('postcardFeedback');
+    const pcSubmitBtn = document.getElementById('submitPostcardBtn');
+    const pcEndpoint = <?= json_encode(BASE_URL . '/postcard.php') ?>;
+
+    function showPostcardStatus(msg, isError) {
+        if (!pcFeedback) return;
+        pcFeedback.textContent = msg;
+        pcFeedback.className = 'postcard-feedback ' + (isError ? 'is-error' : 'is-success');
+        pcFeedback.style.display = 'block';
+    }
+
+    async function submitPostcard(payload) {
+        const res = await fetch(pcEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Kunne ikke sende postkortet lige nu.');
+        }
+        return data;
+    }
+
+    if (nodBtn) {
+        const postId = Number(nodBtn.getAttribute('data-post-id'));
+        const sentKey = 'logbog_postcard_sent_' + postId;
+        try {
+            if (sessionStorage.getItem(sentKey) === '1') {
+                if (pcActions) pcActions.style.display = 'none';
+                showPostcardStatus('✓ Du har allerede sendt en hilsen til dette indlæg i denne session.', false);
+            }
+        } catch (_) {}
+
+        nodBtn.addEventListener('click', async () => {
+            nodBtn.disabled = true;
+            nodBtn.textContent = '[ SENDER... ]';
             try {
-                await navigator.clipboard.writeText(url);
-                copyBtn.textContent = '[ KOPIERET ✓ ]';
-                copyBtn.classList.add('copied');
-                setTimeout(() => {
-                    copyBtn.textContent = '[ KOPIÉR LINK ]';
-                    copyBtn.classList.remove('copied');
-                }, 2200);
-            } catch (_) {
-                window.prompt('Kopiér link:', url);
+                const data = await submitPostcard({ post_id: postId, kind: 'nod' });
+                if (pcActions) pcActions.style.display = 'none';
+                if (pcForm) pcForm.style.display = 'none';
+                showPostcardStatus('✓ ' + data.message, false);
+                try { sessionStorage.setItem(sentKey, '1'); } catch (_) {}
+            } catch (err) {
+                nodBtn.disabled = false;
+                nodBtn.textContent = '[ ♡ SEND ET STILLE NIK ]';
+                showPostcardStatus(err.message, true);
             }
         });
     }
-    if (shareBtn && navigator.share) {
-        shareBtn.style.display = 'inline-block';
-        shareBtn.addEventListener('click', async () => {
+
+    if (toggleFormBtn && pcForm) {
+        toggleFormBtn.addEventListener('click', () => {
+            const isHidden = pcForm.style.display === 'none';
+            pcForm.style.display = isHidden ? 'flex' : 'none';
+            if (isHidden) {
+                const msgEl = document.getElementById('pcMessage');
+                if (msgEl) msgEl.focus();
+            }
+        });
+    }
+
+    if (pcForm) {
+        pcForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const postId = Number(pcForm.querySelector('input[name="post_id"]').value);
+            const message = (document.getElementById('pcMessage').value || '').trim();
+            const senderName = (document.getElementById('pcName').value || '').trim();
+            const senderContact = (document.getElementById('pcContact').value || '').trim();
+            const website = (document.getElementById('pcWebsite').value || '').trim();
+
+            if (!message) {
+                showPostcardStatus('Skriv en kort hilsen, eller brug knappen "Send et stille nik".', true);
+                return;
+            }
+
+            if (pcSubmitBtn) {
+                pcSubmitBtn.disabled = true;
+                pcSubmitBtn.textContent = '[ SENDER... ]';
+            }
+
             try {
-                await navigator.share({
-                    title: shareBtn.getAttribute('data-title') || document.title,
-                    url: shareBtn.getAttribute('data-url')
+                const data = await submitPostcard({
+                    post_id: postId,
+                    kind: 'note',
+                    sender_name: senderName,
+                    sender_contact: senderContact,
+                    message: message,
+                    website: website
                 });
-            } catch (_) {}
+                if (pcActions) pcActions.style.display = 'none';
+                pcForm.style.display = 'none';
+                showPostcardStatus('✓ ' + data.message, false);
+                try { sessionStorage.setItem('logbog_postcard_sent_' + postId, '1'); } catch (_) {}
+            } catch (err) {
+                if (pcSubmitBtn) {
+                    pcSubmitBtn.disabled = false;
+                    pcSubmitBtn.textContent = '[ SEND PRIVAT POSTKORT ]';
+                }
+                showPostcardStatus(err.message, true);
+            }
         });
     }
 })();

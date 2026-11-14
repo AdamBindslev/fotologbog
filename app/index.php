@@ -332,6 +332,80 @@ require_once __DIR__ . '/../includes/auth.php';
             font-weight: 700;
         }
 
+        .tab-btn {
+            position: relative;
+        }
+
+        .postcard-unread-badge {
+            position: absolute;
+            top: -2px;
+            right: calc(50% - 22px);
+            background: var(--accent);
+            color: #fff;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            padding: 2px 5px;
+            border-radius: 999px;
+        }
+
+        .postcard-inbox-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+        }
+
+        .postcard-inbox-card.is-unread {
+            border-left: 4px solid var(--accent);
+        }
+
+        .postcard-inbox-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .postcard-inbox-post {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            background: var(--bg-page);
+            border: 1px dashed var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 10px;
+            text-decoration: none;
+            color: var(--text-main);
+        }
+
+        .postcard-inbox-post img {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .postcard-inbox-msg {
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 6px 0 10px;
+            white-space: pre-wrap;
+        }
+
+        .postcard-inbox-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
         /* Post History List */
         .history-item {
             background: var(--card-bg);
@@ -880,6 +954,24 @@ require_once __DIR__ . '/../includes/auth.php';
         </button>
     </div>
 
+    <!-- 3B. PRIVATE POSTKORT (Indbakke fra læsere) -->
+    <div id="viewPostcards" class="view-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px;">
+            <h3 style="font-family: var(--font-mono); font-size: 14px; text-transform: uppercase;">
+                [ ✉ PRIVATE POSTKORT ]
+            </h3>
+            <button type="button" id="markAllPostcardsReadBtn" class="btn-small" onclick="markAllPostcardsRead()" style="display: none;">
+                ✓ Marker alle som læst
+            </button>
+        </div>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+            Stille nik og hilsener sendt privat fra dine læsere. Kun synligt her for dig.
+        </p>
+        <div id="postcardsListContainer">
+            <p style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">Indlæser postkort...</p>
+        </div>
+    </div>
+
     <!-- 4. INDSTILLINGER & BACKUP -->
     <div id="viewSettings" class="view-section">
         <!-- Lockdown mode -->
@@ -1060,6 +1152,11 @@ require_once __DIR__ . '/../includes/auth.php';
         <span class="tab-icon">[ ≡ ]</span>
         <span>Indlæg</span>
     </button>
+    <button class="tab-btn" onclick="switchView('postcards')">
+        <span class="tab-icon">[ ✉ ]</span>
+        <span>Postkort</span>
+        <span id="postcardsUnreadBadge" class="postcard-unread-badge" style="display: none;"></span>
+    </button>
     <button class="tab-btn" onclick="switchView('settings')">
         <span class="tab-icon">[ ⚙ ]</span>
         <span>Indstillinger</span>
@@ -1120,10 +1217,15 @@ function switchView(viewName) {
         document.getElementById('bottomNav').style.display = 'flex';
         document.querySelectorAll('.tab-btn')[1].classList.add('active');
         loadPostsHistory(true);
+    } else if (viewName === 'postcards') {
+        document.getElementById('viewPostcards').classList.add('active');
+        document.getElementById('bottomNav').style.display = 'flex';
+        document.querySelectorAll('.tab-btn')[2].classList.add('active');
+        loadPostcards();
     } else if (viewName === 'settings') {
         document.getElementById('viewSettings').classList.add('active');
         document.getElementById('bottomNav').style.display = 'flex';
-        document.querySelectorAll('.tab-btn')[2].classList.add('active');
+        document.querySelectorAll('.tab-btn')[3].classList.add('active');
         loadSecuritySettings();
     }
     window.scrollTo(0, 0);
@@ -1194,6 +1296,7 @@ async function checkAuthStatus() {
             setDefaultDate();
             restoreDraft();
             switchView('compose');
+            refreshPostcardBadge();
         } else {
             switchView('login');
         }
@@ -1222,12 +1325,134 @@ async function handleLogin(e) {
             setDefaultDate();
             restoreDraft();
             switchView('compose');
+            refreshPostcardBadge();
         }
     } catch (err) {
         showAlert(err.message || 'Forkert PIN-kode', 'error');
     } finally {
         btn.disabled = false;
         btn.textContent = 'Lås op';
+    }
+}
+
+function updatePostcardBadge(unreadCount) {
+    const badge = document.getElementById('postcardsUnreadBadge');
+    const markAllBtn = document.getElementById('markAllPostcardsReadBtn');
+    const count = Number(unreadCount) || 0;
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : String(count);
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+    if (markAllBtn) {
+        markAllBtn.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+}
+
+async function refreshPostcardBadge() {
+    try {
+        const data = await apiFetch('get_postcards');
+        if (data && data.success) {
+            updatePostcardBadge(data.unread_count);
+        }
+    } catch (_) {}
+}
+
+function formatPostcardContact(raw) {
+    if (!raw) return '';
+    const trimmed = raw.trim();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        return `<a href="mailto:${escapeHtml(trimmed)}" style="color: var(--accent);">${escapeHtml(trimmed)}</a>`;
+    }
+    if (/^https?:\/\/[^\s]+$/i.test(trimmed)) {
+        return `<a href="${escapeHtml(trimmed)}" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">${escapeHtml(trimmed)}</a>`;
+    }
+    return escapeHtml(trimmed);
+}
+
+async function loadPostcards() {
+    const container = document.getElementById('postcardsListContainer');
+    if (!container) return;
+    container.innerHTML = '<p style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">Indlæser postkort...</p>';
+
+    try {
+        const data = await apiFetch('get_postcards');
+        updatePostcardBadge(data.unread_count);
+        const list = data.postcards || [];
+
+        if (list.length === 0) {
+            container.innerHTML = '<p style="font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);">Ingen postkort endnu. Når en læser sender et stille nik eller en hilsen, dukker den op her.</p>';
+            return;
+        }
+
+        container.innerHTML = list.map(pc => {
+            const isUnread = pc.is_read === 0;
+            const kindLabel = pc.kind === 'note' ? '✉ Postkort' : '♡ Stille nik';
+            const sender = pc.sender_name ? escapeHtml(pc.sender_name) : 'Anonym læser';
+            const contactHtml = pc.sender_contact ? ` · ${formatPostcardContact(pc.sender_contact)}` : '';
+            const thumbHtml = pc.post_thumb_url ? `<img src="${escapeHtml(pc.post_thumb_url)}" alt="" loading="lazy">` : '';
+            const msgHtml = pc.message ? `<div class="postcard-inbox-msg">${escapeHtml(pc.message)}</div>` : '';
+            const readBtnHtml = isUnread
+                ? `<button type="button" class="btn-small" onclick="markPostcardRead(${pc.id})">✓ Marker læst</button>`
+                : '';
+
+            return `
+                <div class="postcard-inbox-card ${isUnread ? 'is-unread' : ''}" id="postcard-card-${pc.id}">
+                    <div class="postcard-inbox-meta">
+                        <span><strong>${kindLabel}</strong> · ${sender}${contactHtml}</span>
+                        <span>${escapeHtml(pc.created_at || '')}</span>
+                    </div>
+                    <a class="postcard-inbox-post" href="${escapeHtml(pc.post_url || '#')}" target="_blank" rel="noopener noreferrer">
+                        ${thumbHtml}
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600;">${escapeHtml(pc.post_title || 'Indlæg')}</div>
+                            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">REF ${escapeHtml(pc.post_uid || '')}</div>
+                        </div>
+                    </a>
+                    ${msgHtml}
+                    <div class="postcard-inbox-actions">
+                        ${readBtnHtml}
+                        <button type="button" class="btn-small btn-danger" onclick="deletePostcard(${pc.id})">Slet</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        container.innerHTML = `<p style="color: var(--accent-red);">${escapeHtml(err.message || 'Kunne ikke hente postkort')}</p>`;
+    }
+}
+
+async function markPostcardRead(id) {
+    try {
+        const data = await apiFetch('mark_postcard_read', { method: 'POST', body: { id } });
+        updatePostcardBadge(data.unread_count);
+        loadPostcards();
+    } catch (err) {
+        showAlert(err.message || 'Kunne ikke opdatere postkort', 'error');
+    }
+}
+
+async function markAllPostcardsRead() {
+    try {
+        const data = await apiFetch('mark_postcard_read', { method: 'POST', body: { all: true } });
+        updatePostcardBadge(data.unread_count);
+        loadPostcards();
+    } catch (err) {
+        showAlert(err.message || 'Kunne ikke opdatere postkort', 'error');
+    }
+}
+
+async function deletePostcard(id) {
+    if (!confirm('Vil du slette dette postkort?')) return;
+    try {
+        const data = await apiFetch('delete_postcard', { method: 'POST', body: { id } });
+        updatePostcardBadge(data.unread_count);
+        loadPostcards();
+    } catch (err) {
+        showAlert(err.message || 'Kunne ikke slette postkort', 'error');
     }
 }
 

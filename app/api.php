@@ -612,4 +612,79 @@ if ($action === 'logout') {
     json_reply(['success' => true, 'message' => 'Logget ud']);
 }
 
+// 14. Hent private postkort / stille nik til fotografens indbakke
+if ($action === 'get_postcards') {
+    $db = get_db();
+    $stmt = $db->query("
+        SELECT pc.id, pc.post_id, pc.kind, pc.sender_name, pc.sender_contact, pc.message, pc.is_read, pc.created_at,
+               p.title AS post_title, p.uid AS post_uid, p.image_path AS post_image_path, p.published_at AS post_published_at
+        FROM postcards pc
+        INNER JOIN posts p ON p.id = pc.post_id
+        ORDER BY pc.created_at DESC, pc.id DESC
+        LIMIT 100
+    ");
+    $rows = $stmt ? $stmt->fetchAll() : [];
+
+    $unreadStmt = $db->query("SELECT COUNT(*) FROM postcards WHERE is_read = 0");
+    $unreadCount = (int)$unreadStmt->fetchColumn();
+
+    foreach ($rows as &$r) {
+        $r['id'] = (int)$r['id'];
+        $r['post_id'] = (int)$r['post_id'];
+        $r['is_read'] = (int)$r['is_read'];
+        $r['post_thumb_url'] = !empty($r['post_image_path']) ? get_thumbnail_url($r['post_image_path']) : '';
+        $r['post_url'] = get_post_url([
+            'id' => $r['post_id'],
+            'uid' => $r['post_uid'],
+            'title' => $r['post_title'],
+            'published_at' => $r['post_published_at']
+        ]);
+    }
+    unset($r);
+
+    json_reply([
+        'success' => true,
+        'unread_count' => $unreadCount,
+        'postcards' => $rows
+    ]);
+}
+
+// 15. Marker postkort som læst (enkeltvis eller alle)
+if ($action === 'mark_postcard_read') {
+    require_post_method();
+    require_csrf_token($input);
+
+    $db = get_db();
+    if (!empty($input['all'])) {
+        $db->exec("UPDATE postcards SET is_read = 1 WHERE is_read = 0");
+    } else {
+        $id = (int)($input['id'] ?? 0);
+        if ($id <= 0) {
+            json_reply(['error' => 'Ugyldigt postkort-ID'], 400);
+        }
+        $stmt = $db->prepare("UPDATE postcards SET is_read = 1 WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+    }
+
+    $unreadCount = (int)$db->query("SELECT COUNT(*) FROM postcards WHERE is_read = 0")->fetchColumn();
+    json_reply(['success' => true, 'unread_count' => $unreadCount]);
+}
+
+// 16. Slet et postkort
+if ($action === 'delete_postcard') {
+    require_post_method();
+    require_csrf_token($input);
+
+    $id = (int)($input['id'] ?? 0);
+    if ($id <= 0) {
+        json_reply(['error' => 'Ugyldigt postkort-ID'], 400);
+    }
+    $db = get_db();
+    $stmt = $db->prepare("DELETE FROM postcards WHERE id = :id");
+    $stmt->execute([':id' => $id]);
+
+    $unreadCount = (int)$db->query("SELECT COUNT(*) FROM postcards WHERE is_read = 0")->fetchColumn();
+    json_reply(['success' => true, 'unread_count' => $unreadCount]);
+}
+
 json_reply(['error' => 'Ukendt handling: ' . htmlspecialchars($action)], 400);

@@ -23,7 +23,7 @@ cp -R "$ROOT_DIR/assets" "$DEPLOY_DIR/"
 cp -R "$ROOT_DIR/includes" "$DEPLOY_DIR/"
 
 # 3. Kopiér sikre enkeltfiler (check.php udelades fra produktion af sikkerhedshensyn)
-for file in .htaccess config.php index.php post.php og-image.php rss.php README.md; do
+for file in .htaccess config.php index.php post.php postcard.php og-image.php rss.php README.md; do
     if [ -f "$ROOT_DIR/$file" ]; then
         cp "$ROOT_DIR/$file" "$DEPLOY_DIR/"
     fi
