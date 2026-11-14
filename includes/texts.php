@@ -29,24 +29,24 @@ function logbog_default_texts(): array {
 
         // Privat postkort & stille nik
         'postcard_title'            => defined('POSTCARD_TITLE') ? (string)POSTCARD_TITLE : '[ PRIVAT POSTKORT ]',
-        'postcard_intro'            => defined('POSTCARD_INTRO') ? (string)POSTCARD_INTRO : 'Ingen offentlige likes eller kommentarspor — men hvis billedet ramte noget i dig, kan du sende et stille nik eller en kort hilsen direkte til fotografens private indbakke.',
+        'postcard_intro'            => defined('POSTCARD_INTRO') ? (string)POSTCARD_INTRO : 'Ingen offentlige likes eller kommentarspor — men hvis du har lyst, kan du sende et stille nik eller en kort hilsen direkte til min private indbakke.',
         'postcard_nod_btn'          => '[ ♡ SEND ET STILLE NIK ]',
         'postcard_write_btn'        => '[ ✉ SKRIV ET POSTKORT ]',
         'postcard_name_placeholder' => 'Dit navn (valgfrit)',
-        'postcard_contact_placeholder' => 'E-mail / @ / site (valgfrit, hvis du vil have svar)',
-        'postcard_msg_placeholder'  => 'Skriv en kort hilsen om billedet eller dagen...',
+        'postcard_contact_placeholder' => 'E-mail / @ / site (valgfrit)',
+        'postcard_msg_placeholder'  => 'Skriv en hilsen',
         'postcard_privacy_note'     => 'Kun synligt for fotografen.',
         'postcard_submit_btn'       => '[ SEND PRIVAT POSTKORT ]',
         'postcard_sending'          => '[ SENDER... ]',
         'postcard_already_sent'     => '✓ Du har allerede sendt en hilsen til dette indlæg i denne session.',
         'postcard_empty_msg_error'  => 'Skriv en kort hilsen, eller brug knappen for et stille nik.',
-        'postcard_sent_nod'         => 'Tak — dit stille nik er sendt privat til fotografen.',
+        'postcard_sent_nod'         => 'Tak — dit stille nik er sendt privat.',
         'postcard_sent_note'        => 'Tak — dit postkort er sendt privat til fotografen.',
         'postcard_rate_post_error'  => 'Du har allerede sendt en hilsen til dette indlæg for nylig.',
         'postcard_rate_hour_error'  => 'Der er sendt lidt mange postkort herfra i timen. Prøv igen lidt senere.',
 
         // Kolofon
-        'colophon_ethos'      => defined('COLOPHON_ETHOS') ? (string)COLOPHON_ETHOS : 'Udgivet uden offentlige likes, algoritmer eller følgere — for glæden ved at se og skabe hver dag.',
+        'colophon_ethos'      => defined('COLOPHON_ETHOS') ? (string)COLOPHON_ETHOS : 'Udgivet uden offentlige likes, algoritmer eller følgere — for glæden ved at se og skabe.',
         'colophon_rss_label'  => '[ RSS FEED ]',
         'colophon_repo_label' => defined('COLOPHON_REPO_LABEL') ? (string)COLOPHON_REPO_LABEL : 'Bygget på Logbog — start din egen →',
 
