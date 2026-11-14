@@ -1181,16 +1181,18 @@ function extract_exif_from_image_file(string $filePath): array {
 function render_colophon(): void {
     $rssUrl = htmlspecialchars(BASE_URL . '/rss.php', ENT_QUOTES, 'UTF-8');
     $repoUrl = defined('COLOPHON_REPO_URL') ? trim((string)COLOPHON_REPO_URL) : '';
+    $repoLabel = defined('COLOPHON_REPO_LABEL') ? trim((string)COLOPHON_REPO_LABEL) : 'Bygget på Logbog — start din egen →';
+    $ethos = defined('COLOPHON_ETHOS') ? trim((string)COLOPHON_ETHOS) : '';
     ?>
     <footer class="notebook-colophon" aria-label="Kolofon">
-        <p class="colophon-ethos">
-            Udgivet uden offentlige likes, algoritmer eller følgere — for glæden ved at se og skabe hver dag.
-        </p>
+        <?php if ($ethos !== ''): ?>
+            <p class="colophon-ethos"><?= htmlspecialchars($ethos, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php endif; ?>
         <p class="colophon-links">
             <a href="<?= $rssUrl ?>" title="Abonnér via RSS">[ RSS FEED ]</a>
             <?php if ($repoUrl !== ''): ?>
                 <span class="colophon-sep" aria-hidden="true">·</span>
-                <a href="<?= htmlspecialchars($repoUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">Bygget på Logbog — start din egen →</a>
+                <a href="<?= htmlspecialchars($repoUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars($repoLabel, ENT_QUOTES, 'UTF-8') ?></a>
             <?php endif; ?>
         </p>
     </footer>

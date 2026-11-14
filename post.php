@@ -237,10 +237,10 @@ $nextPost = $adjacent['next'];
                 <!-- Privat postkort / stille nik (ingen offentlige tællere) -->
                 <section id="postkort" class="postcard-box" aria-label="Send et privat postkort">
                     <div class="postcard-header">
-                        <span class="postcard-stamp">[ PRIVAT POSTKORT ]</span>
-                        <p class="postcard-intro">
-                            Ingen offentlige likes eller kommentarspor — men hvis billedet ramte noget i dig, kan du sende et stille nik eller en kort hilsen direkte til fotografens private indbakke.
-                        </p>
+                        <span class="postcard-stamp"><?= htmlspecialchars(POSTCARD_TITLE, ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php if (trim((string)POSTCARD_INTRO) !== ''): ?>
+                            <p class="postcard-intro"><?= htmlspecialchars(POSTCARD_INTRO, ENT_QUOTES, 'UTF-8') ?></p>
+                        <?php endif; ?>
                     </div>
                     <div class="postcard-actions" id="postcardActions">
                         <button type="button" class="postcard-btn postcard-btn-nod" id="sendNodBtn" data-post-id="<?= (int)$post['id'] ?>">

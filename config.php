@@ -22,6 +22,12 @@ if (!defined('COUNTER_DEV_ID')) define('COUNTER_DEV_ID', '');
 
 // Link til projektets kildekode i sidens diskrete kolofon (lad stå tom for at skjule)
 if (!defined('COLOPHON_REPO_URL')) define('COLOPHON_REPO_URL', 'https://github.com/AdamBindslev/fotologbog');
+if (!defined('COLOPHON_REPO_LABEL')) define('COLOPHON_REPO_LABEL', 'Bygget på Logbog — start din egen →');
+if (!defined('COLOPHON_ETHOS')) define('COLOPHON_ETHOS', 'Udgivet uden offentlige likes, algoritmer eller følgere — for glæden ved at se og skabe hver dag.');
+
+// Tekster til privat postkort-boks på enkeltsider (kan overskrives i config.local.php)
+if (!defined('POSTCARD_TITLE')) define('POSTCARD_TITLE', '[ PRIVAT POSTKORT ]');
+if (!defined('POSTCARD_INTRO')) define('POSTCARD_INTRO', 'Ingen offentlige likes eller kommentarspor — men hvis billedet ramte noget i dig, kan du sende et stille nik eller en kort hilsen direkte til fotografens private indbakke.');
 
 // Stier på serveren
 define('BASE_DIR', __DIR__);
