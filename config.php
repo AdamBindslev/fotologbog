@@ -79,3 +79,6 @@ define('AUTH_SECRET', 'logbog_fallback_secret_' . hash('sha256', __DIR__));
 
 // Antal indlæg pr. side i feedet
 define('POSTS_PER_PAGE', 10);
+
+// Tekst-oversættelse & tilpasning (overskrives via $SITE_TEXTS i config.local.php)
+require_once __DIR__ . '/includes/texts.php';

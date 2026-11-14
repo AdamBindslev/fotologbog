@@ -97,7 +97,7 @@ $analogStamp = format_analog_header($post['published_at'], $post['location'] ?? 
                 <?php else: ?>
                     <div class="entry-photo-exif">
                         <span class="exif-icon" aria-hidden="true">⌀</span>
-                        <span class="exif-data">Ingen Exif</span>
+                        <span class="exif-data"><?= htmlspecialchars(t('post_no_exif')) ?></span>
                     </div>
                 <?php endif; ?>
                 <button 
@@ -108,7 +108,7 @@ $analogStamp = format_analog_header($post['published_at'], $post['location'] ?? 
                     data-stamp="<?= htmlspecialchars($analogStamp) ?>"
                     data-exif="<?= htmlspecialchars($exifStr ?? '') ?>"
                     title="Åbn i lup (Fuld skærm)"
-                >[ ⤢ LUP ]</button>
+                ><?= htmlspecialchars(t('post_loupe')) ?></button>
             </div>
         </div>
     <?php endif; ?>
@@ -133,7 +133,7 @@ $analogStamp = format_analog_header($post['published_at'], $post['location'] ?? 
                 <?php endif; ?>
             </div>
             <div class="meta-actions-right">
-                <a href="<?= $postUrl ?>#postkort" class="entry-postcard-link" title="Send et stille nik eller privat postkort">[ ✉ POSTKORT ]</a>
+                <a href="<?= $postUrl ?>#postkort" class="entry-postcard-link" title="Send et stille nik eller privat postkort"><?= htmlspecialchars(t('post_postcard_link')) ?></a>
                 <a href="<?= $postUrl ?>" class="entry-stamp-badge" title="Permanent link">
                     <span class="stamp-icon">REF</span>
                     <span class="stamp-code"><?= htmlspecialchars($uid) ?></span>

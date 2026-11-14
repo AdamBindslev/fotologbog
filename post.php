@@ -237,17 +237,17 @@ $nextPost = $adjacent['next'];
                 <!-- Privat postkort / stille nik (ingen offentlige tællere) -->
                 <section id="postkort" class="postcard-box" aria-label="Send et privat postkort">
                     <div class="postcard-header">
-                        <span class="postcard-stamp"><?= htmlspecialchars(POSTCARD_TITLE, ENT_QUOTES, 'UTF-8') ?></span>
-                        <?php if (trim((string)POSTCARD_INTRO) !== ''): ?>
-                            <p class="postcard-intro"><?= htmlspecialchars(POSTCARD_INTRO, ENT_QUOTES, 'UTF-8') ?></p>
+                        <span class="postcard-stamp"><?= htmlspecialchars(t('postcard_title'), ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php if (trim(t('postcard_intro')) !== ''): ?>
+                            <p class="postcard-intro"><?= htmlspecialchars(t('postcard_intro'), ENT_QUOTES, 'UTF-8') ?></p>
                         <?php endif; ?>
                     </div>
                     <div class="postcard-actions" id="postcardActions">
                         <button type="button" class="postcard-btn postcard-btn-nod" id="sendNodBtn" data-post-id="<?= (int)$post['id'] ?>">
-                            [ ♡ SEND ET STILLE NIK ]
+                            <?= htmlspecialchars(t('postcard_nod_btn'), ENT_QUOTES, 'UTF-8') ?>
                         </button>
                         <button type="button" class="postcard-btn postcard-btn-toggle" id="togglePostcardFormBtn">
-                            [ ✉ SKRIV ET POSTKORT ]
+                            <?= htmlspecialchars(t('postcard_write_btn'), ENT_QUOTES, 'UTF-8') ?>
                         </button>
                     </div>
                     <form id="postcardForm" class="postcard-form" style="display: none;" novalidate>
@@ -257,13 +257,13 @@ $nextPost = $adjacent['next'];
                             <input type="text" id="pcWebsite" name="website" tabindex="-1" autocomplete="off">
                         </div>
                         <div class="postcard-row">
-                            <input type="text" id="pcName" name="sender_name" maxlength="80" class="postcard-input" placeholder="Dit navn (valgfrit)">
-                            <input type="text" id="pcContact" name="sender_contact" maxlength="120" class="postcard-input" placeholder="E-mail / @ / site (valgfrit, hvis du vil have svar)">
+                            <input type="text" id="pcName" name="sender_name" maxlength="80" class="postcard-input" placeholder="<?= htmlspecialchars(t('postcard_name_placeholder'), ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="text" id="pcContact" name="sender_contact" maxlength="120" class="postcard-input" placeholder="<?= htmlspecialchars(t('postcard_contact_placeholder'), ENT_QUOTES, 'UTF-8') ?>">
                         </div>
-                        <textarea id="pcMessage" name="message" maxlength="1000" rows="3" class="postcard-textarea" placeholder="Skriv en kort hilsen om billedet eller dagen..."></textarea>
+                        <textarea id="pcMessage" name="message" maxlength="1000" rows="3" class="postcard-textarea" placeholder="<?= htmlspecialchars(t('postcard_msg_placeholder'), ENT_QUOTES, 'UTF-8') ?>"></textarea>
                         <div class="postcard-form-footer">
-                            <span class="postcard-privacy-note">Kun synligt for fotografen.</span>
-                            <button type="submit" class="postcard-btn postcard-btn-submit" id="submitPostcardBtn">[ SEND PRIVAT POSTKORT ]</button>
+                            <span class="postcard-privacy-note"><?= htmlspecialchars(t('postcard_privacy_note'), ENT_QUOTES, 'UTF-8') ?></span>
+                            <button type="submit" class="postcard-btn postcard-btn-submit" id="submitPostcardBtn"><?= htmlspecialchars(t('postcard_submit_btn'), ENT_QUOTES, 'UTF-8') ?></button>
                         </div>
                     </form>
                     <div id="postcardFeedback" class="postcard-feedback" role="status" aria-live="polite" style="display: none;"></div>
@@ -274,18 +274,18 @@ $nextPost = $adjacent['next'];
                     <div class="post-nav-slot post-nav-prev">
                         <?php if ($prevPost): ?>
                             <a href="<?= htmlspecialchars(get_post_url($prevPost)) ?>" id="prevPostLink" class="post-nav-card" title="<?= htmlspecialchars($prevPost['title']) ?>">
-                                <span class="post-nav-dir">← [ FORRIGE OPTEGNELSE ]</span>
+                                <span class="post-nav-dir"><?= htmlspecialchars(t('nav_prev_post')) ?></span>
                                 <span class="post-nav-meta"><?= format_analog_date($prevPost['published_at']) ?> · <?= htmlspecialchars($prevPost['title']) ?></span>
                             </a>
                         <?php endif; ?>
                     </div>
                     <div class="post-nav-center">
-                        <a href="<?= htmlspecialchars(BASE_URL) ?>/" class="back-link">[ OVERSIGT ]</a>
+                        <a href="<?= htmlspecialchars(BASE_URL) ?>/" class="back-link"><?= htmlspecialchars(t('nav_overview')) ?></a>
                     </div>
                     <div class="post-nav-slot post-nav-next">
                         <?php if ($nextPost): ?>
                             <a href="<?= htmlspecialchars(get_post_url($nextPost)) ?>" id="nextPostLink" class="post-nav-card" title="<?= htmlspecialchars($nextPost['title']) ?>">
-                                <span class="post-nav-dir">[ NÆSTE OPTEGNELSE ] →</span>
+                                <span class="post-nav-dir"><?= htmlspecialchars(t('nav_next_post')) ?></span>
                                 <span class="post-nav-meta"><?= format_analog_date($nextPost['published_at']) ?> · <?= htmlspecialchars($nextPost['title']) ?></span>
                             </a>
                         <?php endif; ?>
@@ -412,6 +412,13 @@ if (document.readyState === 'complete') {
     const pcFeedback = document.getElementById('postcardFeedback');
     const pcSubmitBtn = document.getElementById('submitPostcardBtn');
     const pcEndpoint = <?= json_encode(BASE_URL . '/postcard.php') ?>;
+    const pcTexts = <?= json_encode([
+        'sending' => t('postcard_sending'),
+        'alreadySent' => t('postcard_already_sent'),
+        'nodBtn' => t('postcard_nod_btn'),
+        'emptyMsg' => t('postcard_empty_msg_error'),
+        'submitBtn' => t('postcard_submit_btn'),
+    ], JSON_UNESCAPED_UNICODE) ?>;
 
     function showPostcardStatus(msg, isError) {
         if (!pcFeedback) return;
@@ -439,13 +446,13 @@ if (document.readyState === 'complete') {
         try {
             if (sessionStorage.getItem(sentKey) === '1') {
                 if (pcActions) pcActions.style.display = 'none';
-                showPostcardStatus('✓ Du har allerede sendt en hilsen til dette indlæg i denne session.', false);
+                showPostcardStatus(pcTexts.alreadySent, false);
             }
         } catch (_) {}
 
         nodBtn.addEventListener('click', async () => {
             nodBtn.disabled = true;
-            nodBtn.textContent = '[ SENDER... ]';
+            nodBtn.textContent = pcTexts.sending;
             try {
                 const data = await submitPostcard({ post_id: postId, kind: 'nod' });
                 if (pcActions) pcActions.style.display = 'none';
@@ -454,7 +461,7 @@ if (document.readyState === 'complete') {
                 try { sessionStorage.setItem(sentKey, '1'); } catch (_) {}
             } catch (err) {
                 nodBtn.disabled = false;
-                nodBtn.textContent = '[ ♡ SEND ET STILLE NIK ]';
+                nodBtn.textContent = pcTexts.nodBtn;
                 showPostcardStatus(err.message, true);
             }
         });
@@ -481,13 +488,13 @@ if (document.readyState === 'complete') {
             const website = (document.getElementById('pcWebsite').value || '').trim();
 
             if (!message) {
-                showPostcardStatus('Skriv en kort hilsen, eller brug knappen "Send et stille nik".', true);
+                showPostcardStatus(pcTexts.emptyMsg, true);
                 return;
             }
 
             if (pcSubmitBtn) {
                 pcSubmitBtn.disabled = true;
-                pcSubmitBtn.textContent = '[ SENDER... ]';
+                pcSubmitBtn.textContent = pcTexts.sending;
             }
 
             try {
@@ -506,7 +513,7 @@ if (document.readyState === 'complete') {
             } catch (err) {
                 if (pcSubmitBtn) {
                     pcSubmitBtn.disabled = false;
-                    pcSubmitBtn.textContent = '[ SEND PRIVAT POSTKORT ]';
+                    pcSubmitBtn.textContent = pcTexts.submitBtn;
                 }
                 showPostcardStatus(err.message, true);
             }

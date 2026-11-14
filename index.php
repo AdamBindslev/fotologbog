@@ -198,7 +198,7 @@ $ogTitle = !empty($activeFilterTitle) ? ($activeFilterTitle . ' – ' . SITE_TIT
                     </div>
                     <nav class="site-nav">
                         <a href="<?= htmlspecialchars(BASE_URL) ?>/" class="<?= ($view === 'feed' && !$filterYear && !$filterTag && !$filterLocation) ? 'active' : '' ?>">[ LOGBOG ]</a>
-                        <a href="<?= htmlspecialchars(BASE_URL) ?>/?view=archive" class="<?= ($view === 'archive' || $filterYear) ? 'active' : '' ?>">[ ARKIV ]</a>
+                        <a href="<?= htmlspecialchars(BASE_URL) ?>/?view=archive" class="<?= ($view === 'archive' || $filterYear) ? 'active' : '' ?>"><?= htmlspecialchars(t('nav_archive')) ?></a>
                         <a href="<?= htmlspecialchars(BASE_URL) ?>/?view=index" class="<?= ($view === 'index') ? 'active' : '' ?>">[ INDEKS ]</a>
                         <a href="<?= htmlspecialchars(BASE_URL) ?>/rss.php" target="_blank" rel="noopener">[ RSS ]</a>
                     </nav>
@@ -210,10 +210,10 @@ $ogTitle = !empty($activeFilterTitle) ? ($activeFilterTitle . ' – ' . SITE_TIT
             <main>
         <?php if ($view === 'archive'): ?>
             <!-- Arkivvisning med Kontaktark-stak (Nyeste forrest, til at bladre i) -->
-            <h2 class="archive-title">[ ARKIV &amp; KONTAKTARK ]</h2>
+            <h2 class="archive-title"><?= htmlspecialchars(t('archive_title')) ?></h2>
             <?php if (empty($archiveMonths)): ?>
                 <div class="empty-log">
-                    <p>[ INGEN INDLÆG ARKIVERET ENDNU ]</p>
+                    <p><?= htmlspecialchars(t('archive_empty')) ?></p>
                     <p style="margin-top: 0.5rem; font-size: 0.9rem;">Tidslinjen og kontaktarkene opbygges i takt med, at dagens fotografier føjes til logbogen.</p>
                 </div>
             <?php else: 
@@ -380,18 +380,18 @@ $ogTitle = !empty($activeFilterTitle) ? ($activeFilterTitle . ' – ' . SITE_TIT
                     <nav class="pagination" aria-label="Sidenavigation">
                         <div class="pagination-prev">
                             <?php if ($page > 1): ?>
-                                <a href="<?= htmlspecialchars(BASE_URL) ?>/?<?= $filterQueryParam ?>page=<?= $page - 1 ?>">← [ NYERE ]</a>
+                                <a href="<?= htmlspecialchars(BASE_URL) ?>/?<?= $filterQueryParam ?>page=<?= $page - 1 ?>"><?= htmlspecialchars(t('nav_newer')) ?></a>
                             <?php endif; ?>
                         </div>
                         <div class="pagination-info">
                             <?php if (!empty($dateRangeStr)): ?>
                                 <span class="pagination-dates">[ <?= $dateRangeStr ?> ]</span>
                             <?php endif; ?>
-                            <span class="pagination-count">SIDE <?= $page ?> AF <?= $totalPages ?></span>
+                            <span class="pagination-count"><?= htmlspecialchars(t('feed_page_of', ['page' => $page, 'total' => $totalPages])) ?></span>
                         </div>
                         <div class="pagination-next">
                             <?php if ($page < $totalPages): ?>
-                                <a href="<?= htmlspecialchars(BASE_URL) ?>/?<?= $filterQueryParam ?>page=<?= $page + 1 ?>">[ TIDLIGERE ] →</a>
+                                <a href="<?= htmlspecialchars(BASE_URL) ?>/?<?= $filterQueryParam ?>page=<?= $page + 1 ?>"><?= htmlspecialchars(t('nav_older')) ?></a>
                             <?php endif; ?>
                         </div>
                     </nav>

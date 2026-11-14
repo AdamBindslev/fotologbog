@@ -63,7 +63,7 @@ $stmtRecentPost = $db->prepare("
 ");
 $stmtRecentPost->execute([':post_id' => $postId, ':ip_hash' => $ipHash]);
 if ((int)$stmtRecentPost->fetchColumn() > 0) {
-    postcard_reply(['error' => 'Du har allerede sendt en hilsen til dette indlæg for nylig.'], 429);
+    postcard_reply(['error' => t('postcard_rate_post_error')], 429);
 }
 
 // Rate limit 2: Maks 10 postkort pr. IP-hash i timen
@@ -74,7 +74,7 @@ $stmtHourly = $db->prepare("
 ");
 $stmtHourly->execute([':ip_hash' => $ipHash]);
 if ((int)$stmtHourly->fetchColumn() >= 10) {
-    postcard_reply(['error' => 'Der er sendt lidt mange postkort herfra i timen. Prøv igen lidt senere.'], 429);
+    postcard_reply(['error' => t('postcard_rate_hour_error')], 429);
 }
 
 $senderName = trim((string)($input['sender_name'] ?? ''));
@@ -103,7 +103,5 @@ $stmtInsert->execute([
 postcard_reply([
     'success' => true,
     'kind' => $kind,
-    'message' => $kind === 'note'
-        ? 'Tak — dit postkort er sendt privat til fotografen.'
-        : 'Tak — dit stille nik er sendt privat til fotografen.'
+    'message' => $kind === 'note' ? t('postcard_sent_note') : t('postcard_sent_nod')
 ]);
