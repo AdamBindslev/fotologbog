@@ -681,6 +681,169 @@ require_once __DIR__ . '/../includes/auth.php';
             display: block;
             object-fit: contain;
         }
+
+        /* Håndskrift / Tegneflade (iPad + Apple Pencil) */
+        .hw-toggle-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .hw-panel {
+            margin-top: 10px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .hw-panel.hw-fullscreen {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            margin: 0;
+            border-radius: 0;
+            border: none;
+            display: flex;
+            flex-direction: column;
+            background: #e8e4da;
+            padding-top: var(--safe-top);
+            padding-bottom: var(--safe-bottom);
+        }
+        .hw-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            background: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .hw-tool-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding-right: 6px;
+            border-right: 1px solid var(--border-color);
+        }
+        .hw-tool-group:last-child {
+            border-right: none;
+            padding-right: 0;
+            margin-left: auto;
+        }
+        .hw-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            padding: 0;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2);
+            transition: transform 0.12s, border-color 0.12s;
+        }
+        .hw-swatch.active {
+            border-color: var(--accent);
+            transform: scale(1.14);
+        }
+        .hw-btn {
+            background: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            line-height: 1.3;
+            white-space: nowrap;
+        }
+        .hw-btn.active {
+            background: var(--accent);
+            color: var(--bg-color);
+            border-color: var(--accent);
+        }
+        .hw-btn:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+        .hw-paper-scroll {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            background: #e8e4da;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+        }
+        .hw-panel.hw-fullscreen .hw-paper-scroll {
+            flex: 1;
+            padding: 16px;
+            align-items: flex-start;
+        }
+        .hw-paper-wrap {
+            position: relative;
+            width: 100%;
+            max-width: 644px;
+            background-color: #f9f7f1;
+            border: 1px solid #d5cfc2;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            overflow: hidden;
+        }
+        .hw-guide-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .hw-canvas {
+            position: relative;
+            z-index: 1;
+            display: block;
+            width: 100%;
+            height: auto;
+            touch-action: none;
+            cursor: crosshair;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        .hw-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px 10px;
+            background: var(--bg-color);
+            border-top: 1px solid var(--border-color);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .hw-status-badge {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .history-thumb-hw {
+            background-color: #f9f7f1 !important;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent 0,
+                transparent 9px,
+                rgba(110, 102, 92, 0.22) 9px,
+                rgba(110, 102, 92, 0.22) 10px
+            );
+            object-fit: contain !important;
+            object-position: center center !important;
+            padding: 4px;
+        }
     </style>
 </head>
 <body>
@@ -740,7 +903,7 @@ require_once __DIR__ . '/../includes/auth.php';
                     <span class="photo-picker-icon">[ ⌀ FOTO ]</span>
                     <div class="photo-picker-text" id="photoPickerPrompt">
                         <strong>Tryk her for at vælge dagens fotografi (op til 3 til diptykon)</strong><br>
-                        (Udlæser automatisk optagedato, GPS &amp; EXIF)
+                        (Udlæser automatisk optagedato, GPS &amp; EXIF · valgfrit ved håndskreven indførsel)
                     </div>
                     <img id="imagePreview" class="photo-preview" alt="Preview">
                 </div>
@@ -830,6 +993,20 @@ require_once __DIR__ . '/../includes/auth.php';
                     class="form-control" 
                     placeholder="Dine tanker, betragtninger eller historien bag billedet..."
                 ></textarea>
+            </div>
+
+            <!-- Håndskrift / Skitse (iPad & Apple Pencil) -->
+            <div class="form-group">
+                <div class="hw-toggle-bar">
+                    <label class="form-label" style="margin-bottom: 0;">Håndskrift / Skitse</label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span id="composeHwStatus" class="hw-status-badge"></span>
+                        <button type="button" class="btn-small" id="composeHwToggleBtn" onclick="toggleHandwritingPanel('compose')">
+                            ✎ Skriv / tegn i hånden
+                        </button>
+                    </div>
+                </div>
+                <div id="composeHwPanel" class="hw-panel" style="display: none;"></div>
             </div>
 
             <!-- Tags / Emner -->
@@ -1043,16 +1220,21 @@ require_once __DIR__ . '/../includes/auth.php';
         <form id="editForm" onsubmit="handleSaveEdit(event)">
             <input type="hidden" id="editPostId">
 
-            <!-- Mulighed for at skifte billede ved redigering -->
+            <!-- Mulighed for at skifte eller fjerne billede ved redigering -->
             <div class="form-group">
                 <label class="form-label">Fotografi</label>
                 <input type="file" id="editFileInput" accept="image/*" style="display: none;" onchange="handleEditImageSelected(event)">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <img id="editImagePreview" src="" alt="Aktuelt foto" style="width: 72px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <img id="editImagePreview" src="" alt="Aktuelt foto" style="width: 72px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color); background: #f9f7f1;">
                     <div>
-                        <button type="button" class="btn-small" onclick="document.getElementById('editFileInput').click()">
-                            Skift fotografi...
-                        </button>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <button type="button" class="btn-small" onclick="document.getElementById('editFileInput').click()">
+                                Skift / tilføj foto...
+                            </button>
+                            <button type="button" id="editRemoveImageBtn" class="btn-small btn-danger" style="display: none;" onclick="markEditImageRemoved()">
+                                Fjern foto
+                            </button>
+                        </div>
                         <div id="editImageStatus" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 4px;">
                             Behold nuværende foto, eller vælg et nyt
                         </div>
@@ -1083,6 +1265,18 @@ require_once __DIR__ . '/../includes/auth.php';
                     </div>
                 </div>
                 <textarea id="editContentInput" class="form-control" style="min-height: 90px;"></textarea>
+            </div>
+            <div class="form-group">
+                <div class="hw-toggle-bar">
+                    <label class="form-label" style="margin-bottom: 0;">Håndskrift / Skitse</label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span id="editHwStatus" class="hw-status-badge"></span>
+                        <button type="button" class="btn-small" id="editHwToggleBtn" onclick="toggleHandwritingPanel('edit')">
+                            ✎ Tilføj / ret håndskrift
+                        </button>
+                    </div>
+                </div>
+                <div id="editHwPanel" class="hw-panel" style="display: none;"></div>
             </div>
             <div class="form-group">
                 <label class="form-label">Tags (Maks 3)</label>
@@ -1780,6 +1974,17 @@ function renderOgLivePreview() {
         } else {
             drawPreviewWithImage(cachedPreviewImg);
         }
+    } else if (typeof handwritingPads !== 'undefined' && handwritingPads.compose && handwritingPads.compose.hasInk()) {
+        const pad = handwritingPads.compose;
+        const tmp = document.createElement('canvas');
+        tmp.width = pad.canvas.width;
+        tmp.height = pad.canvas.height;
+        const tCtx = tmp.getContext('2d');
+        tCtx.fillStyle = '#f9f7f1';
+        tCtx.fillRect(0, 0, tmp.width, tmp.height);
+        if (pad.guideCanvas) tCtx.drawImage(pad.guideCanvas, 0, 0);
+        tCtx.drawImage(pad.committedCanvas || pad.canvas, 0, 0);
+        drawPreviewWithImage(tmp);
     } else {
         drawPreviewWithImage(null);
     }
@@ -2610,8 +2815,12 @@ async function submitPostWithStatus(status = 'published') {
         ? selectedImagesData.map(x => x.dataUrl)
         : (compressedImageData ? [compressedImageData] : []);
 
-    if (imagesPayload.length === 0) {
-        showAlert('Vælg eller tag venligst mindst ét billede først', 'error');
+    const hwPad = getHandwritingPad('compose');
+    const hwPng = hwPad && hwPad.hasInk() ? hwPad.exportPngDataUrl() : null;
+    const hwJson = hwPng ? hwPad.exportJson() : null;
+
+    if (imagesPayload.length === 0 && !hwPng) {
+        showAlert('Vælg mindst ét billede – eller lav en håndskreven indførsel først', 'error');
         return;
     }
 
@@ -2630,6 +2839,8 @@ async function submitPostWithStatus(status = 'published') {
         published_at: document.getElementById('dateInput').value,
         status: status,
         images_data: imagesPayload,
+        handwriting_image_data: hwPng || '',
+        handwriting_data: hwJson,
         og_style: currentOgStyle,
         tags: selectedTags,
         exif_camera: (document.getElementById('exifCameraInput')?.value || '').trim(),
@@ -2653,6 +2864,10 @@ async function submitPostWithStatus(status = 'published') {
             selectedImagesData = [];
             currentExifData = null;
             selectedTags = [];
+            if (hwPad) {
+                hwPad.reset();
+                closeHandwritingPanel('compose');
+            }
             clearDraft(false);
             renderSelectedTags();
             renderSelectedPhotosStrip();
@@ -2769,17 +2984,23 @@ async function loadPostsHistory(reset = true) {
 
             let html = '';
             data.posts.forEach(p => {
-                const imgUrl = '../uploads/' + encodeURIComponent(p.image_path);
+                const hasPhoto = !!(p.image_path && p.image_path.trim() !== '');
+                const hasHw = !!(p.has_handwriting || p.handwriting_image);
+                const imgUrl = hasPhoto
+                    ? ('../uploads/' + encodeURIComponent(p.image_path))
+                    : (p.handwriting_image ? ('../uploads/' + encodeURIComponent(p.handwriting_image)) : '');
+                const thumbClass = hasPhoto ? 'history-thumb' : 'history-thumb history-thumb-hw';
                 const dateStr = (p.published_at || '').substring(0, 10);
                 const tagNames = (p.tags || []).map(t => '#' + t.name).join(' ');
                 const postIdentifier = encodeURIComponent(p.uid || p.id);
                 const isDraft = p.status === 'draft';
                 const draftBadge = isDraft ? `<span style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-red); border: 1px dashed var(--accent-red); padding: 1px 5px; margin-left: 6px;">KLADDE</span>` : '';
+                const hwBadge = hasHw ? `<span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); border: 1px solid var(--border-color); padding: 1px 5px; margin-left: 6px;">✎ HÅNDSKRIFT</span>` : '';
                 html += `
                     <div class="history-item" id="hist-${Number(p.id)}">
-                        <img src="${imgUrl}" class="history-thumb" alt="">
+                        ${imgUrl ? `<img src="${imgUrl}" class="${thumbClass}" alt="">` : `<div class="history-thumb history-thumb-hw" style="display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:18px;color:#5c5852;">✎</div>`}
                         <div class="history-info">
-                            <div class="history-title">${escapeHtml(p.title)}${draftBadge}</div>
+                            <div class="history-title">${escapeHtml(p.title)}${draftBadge}${hwBadge}</div>
                             <div class="history-date">[${escapeHtml(dateStr)}] ${p.location ? '• ' + escapeHtml(p.location) : ''}</div>
                             ${tagNames ? `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(tagNames)}</div>` : ''}
                         </div>
@@ -2810,6 +3031,21 @@ async function loadPostsHistory(reset = true) {
     }
 }
 
+let editRemoveImages = false;
+let editHadExistingHandwriting = false;
+
+function markEditImageRemoved() {
+    editRemoveImages = true;
+    editCompressedImageData = null;
+    document.getElementById('editFileInput').value = '';
+    const preview = document.getElementById('editImagePreview');
+    preview.src = '';
+    preview.style.display = 'none';
+    const rmBtn = document.getElementById('editRemoveImageBtn');
+    if (rmBtn) rmBtn.style.display = 'none';
+    document.getElementById('editImageStatus').textContent = 'Foto fjernes ved gemning (kræver håndskrift)';
+}
+
 // Billedskift i Rediger-modalen
 async function handleEditImageSelected(e) {
     const file = e.target.files[0];
@@ -2818,7 +3054,12 @@ async function handleEditImageSelected(e) {
     try {
         const res = await compressImageFileToDataUrl(file);
         editCompressedImageData = res.dataUrl;
-        document.getElementById('editImagePreview').src = editCompressedImageData;
+        editRemoveImages = false;
+        const preview = document.getElementById('editImagePreview');
+        preview.src = editCompressedImageData;
+        preview.style.display = 'block';
+        const rmBtn = document.getElementById('editRemoveImageBtn');
+        if (rmBtn) rmBtn.style.display = 'inline-block';
         document.getElementById('editImageStatus').textContent = `✓ Nyt foto valgt (${res.width}×${res.height}px · ~${res.approxSizeKb} KB)`;
 
         const exifData = await extractExifFromFile(file);
@@ -2849,9 +3090,42 @@ async function openEditModal(id) {
         const p = data.post;
 
         editCompressedImageData = null;
+        editRemoveImages = false;
+        editHadExistingHandwriting = !!(p.handwriting_image);
         document.getElementById('editFileInput').value = '';
-        document.getElementById('editImagePreview').src = '../uploads/' + encodeURIComponent(p.image_path);
-        document.getElementById('editImageStatus').textContent = 'Behold nuværende foto, eller vælg et nyt';
+
+        const preview = document.getElementById('editImagePreview');
+        const rmBtn = document.getElementById('editRemoveImageBtn');
+        if (p.image_path) {
+            preview.src = '../uploads/' + encodeURIComponent(p.image_path);
+            preview.style.display = 'block';
+            if (rmBtn) rmBtn.style.display = 'inline-block';
+            document.getElementById('editImageStatus').textContent = 'Behold nuværende foto, skift eller fjern det';
+        } else {
+            preview.src = '';
+            preview.style.display = 'none';
+            if (rmBtn) rmBtn.style.display = 'none';
+            document.getElementById('editImageStatus').textContent = 'Intet foto (ren håndskreven indførsel)';
+        }
+
+        // Indlæs eksisterende håndskrift i editPad så streger kan rettes
+        const editPad = getHandwritingPad('edit');
+        closeHandwritingPanel('edit');
+        if (editPad) {
+            editPad.reset();
+            if (p.handwriting_data) {
+                try {
+                    const parsedHw = typeof p.handwriting_data === 'string'
+                        ? JSON.parse(p.handwriting_data)
+                        : p.handwriting_data;
+                    editPad.loadJson(parsedHw);
+                } catch (err) {
+                    console.warn('Kunne ikke indlæse håndskriftsdata:', err);
+                }
+            }
+            editPad.dirty = false;
+            updateHandwritingStatus('edit');
+        }
 
         document.getElementById('editPostId').value = p.id;
         document.getElementById('editTitleInput').value = p.title || '';
@@ -2913,6 +3187,23 @@ async function handleSaveEdit(e) {
 
     if (editCompressedImageData) {
         payload.image_data = editCompressedImageData;
+    } else if (editRemoveImages) {
+        payload.remove_images = true;
+    }
+
+    const editPad = getHandwritingPad('edit');
+    if (editPad && editPad.dirty) {
+        if (editPad.hasInk()) {
+            const png = editPad.exportPngDataUrl();
+            if (png) {
+                payload.handwriting_image_data = png;
+                payload.handwriting_data = editPad.exportJson();
+            } else if (editHadExistingHandwriting) {
+                payload.clear_handwriting = true;
+            }
+        } else if (editHadExistingHandwriting) {
+            payload.clear_handwriting = true;
+        }
     }
 
     try {
@@ -3073,6 +3364,926 @@ async function handleLogout() {
     } catch (e) {}
     csrfToken = '';
     switchView('login');
+}
+
+// =============================================================
+// Håndskrift / Skitse-tegneflade (iPad + Apple Pencil / Mus)
+// =============================================================
+class HandwritingPad {
+    constructor(containerEl, modeKey) {
+        this.container = containerEl;
+        this.modeKey = modeKey;
+        this.logicalW = 644; // 1:1 med logbogens indre tekstbredde på skrivebord
+        this.lineHeight = 32; // 1:1 med logbogens 32px-papirlinjer
+        this.minLines = 6;
+        this.maxLines = 56;
+        this.logicalH = 12 * this.lineHeight;
+        this.scale = 2;
+        this.exportScale = 3; // 3x Retina-eksport for knivskarpe blækstreger
+
+        this.strokes = [];
+        this.redoStack = [];
+        this.currentStroke = null;
+        this.activePointerId = null;
+
+        this.color = '#1e1c1a';
+        this.size = 3.2;
+        this.penStyle = 'fountain'; // 'fountain' | 'fineliner'
+        this.tool = 'pen'; // 'pen' | 'eraser'
+        this.guide = 'lines'; // 'lines' | 'dots' | 'blank'
+        this.pencilOnly = false;
+        this.isFullscreen = false;
+        this.dirty = false;
+
+        this.committedCanvas = document.createElement('canvas');
+        this.committedCtx = this.committedCanvas.getContext('2d');
+
+        this.buildUI();
+        this.bindEvents();
+        this.resizeCanvas();
+        this.redraw();
+        this.updateToolbarState();
+    }
+
+    buildUI() {
+        this.container.innerHTML = `
+            <div class="hw-toolbar">
+                <div class="hw-tool-group" data-group="colors">
+                    <button type="button" class="hw-swatch active" data-color="#1e1c1a" style="background:#1e1c1a;" title="Sort blæk"></button>
+                    <button type="button" class="hw-swatch" data-color="#1b3a6b" style="background:#1b3a6b;" title="Mørkeblå fyldepen"></button>
+                    <button type="button" class="hw-swatch" data-color="#a62c22" style="background:#a62c22;" title="Stempelrød"></button>
+                    <button type="button" class="hw-swatch" data-color="#5c5852" style="background:#5c5852;" title="Blyantgrå"></button>
+                </div>
+                <div class="hw-tool-group" data-group="sizes">
+                    <button type="button" class="hw-btn" data-action="penstyle" title="Skift mellem Fyldepen (dynamisk blækflow) og Fineliner (jævn streg)">Fyldepen</button>
+                    <button type="button" class="hw-btn" data-size="2.0" title="Fin streg">Fin</button>
+                    <button type="button" class="hw-btn active" data-size="3.2" title="Normal streg">Normal</button>
+                    <button type="button" class="hw-btn" data-size="5.4" title="Bred streg">Bred</button>
+                    <button type="button" class="hw-btn" data-tool="eraser" title="Viskelæder">Visk</button>
+                </div>
+                <div class="hw-tool-group" data-group="history">
+                    <button type="button" class="hw-btn" data-action="undo" title="Fortryd">↶</button>
+                    <button type="button" class="hw-btn" data-action="redo" title="Gendan">↷</button>
+                    <button type="button" class="hw-btn" data-action="guide" title="Skift papirlinjer">Linjer</button>
+                    <button type="button" class="hw-btn" data-action="pencil" title="Kun Apple Pencil (ignorer fingre/håndflade)">✎ Pencil</button>
+                </div>
+                <div class="hw-tool-group" data-group="view">
+                    <button type="button" class="hw-btn" data-action="fullscreen" title="Fuld skærm til iPad">⤢ Fuld</button>
+                    <button type="button" class="hw-btn" data-action="clear" style="color:var(--accent-red);" title="Ryd hele arket">Ryd</button>
+                </div>
+            </div>
+            <div class="hw-paper-scroll">
+                <div class="hw-paper-wrap">
+                    <canvas class="hw-guide-canvas"></canvas>
+                    <canvas class="hw-canvas"></canvas>
+                </div>
+            </div>
+            <div class="hw-footer">
+                <span class="hw-hint">Linjerne matcher logbogens papir 1:1</span>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <span class="hw-lines-label">12 linjer</span>
+                    <button type="button" class="hw-btn" data-action="shrink">− Mindre</button>
+                    <button type="button" class="hw-btn" data-action="expand">+ Mere</button>
+                </div>
+            </div>
+        `;
+
+        this.paperWrap = this.container.querySelector('.hw-paper-wrap');
+        this.guideCanvas = this.container.querySelector('.hw-guide-canvas');
+        this.guideCtx = this.guideCanvas.getContext('2d');
+        this.canvas = this.container.querySelector('.hw-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.hintEl = this.container.querySelector('.hw-hint');
+        this.linesLabelEl = this.container.querySelector('.hw-lines-label');
+    }
+
+    bindEvents() {
+        // Farver
+        this.container.querySelectorAll('.hw-swatch').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.color = btn.dataset.color;
+                this.tool = 'pen';
+                this.updateToolbarState();
+            });
+        });
+
+        // Stregtykkelser
+        this.container.querySelectorAll('[data-size]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.size = parseFloat(btn.dataset.size) || 3.6;
+                this.tool = 'pen';
+                this.updateToolbarState();
+            });
+        });
+
+        // Viskelæder
+        const eraserBtn = this.container.querySelector('[data-tool="eraser"]');
+        if (eraserBtn) {
+            eraserBtn.addEventListener('click', () => {
+                this.tool = this.tool === 'eraser' ? 'pen' : 'eraser';
+                this.updateToolbarState();
+            });
+        }
+
+        // Handlinger
+        const penStyleBtn = this.container.querySelector('[data-action="penstyle"]');
+        if (penStyleBtn) {
+            penStyleBtn.addEventListener('click', () => {
+                const order = ['fountain', 'fineliner', 'pencil'];
+                this.penStyle = order[(order.indexOf(this.penStyle) + 1) % order.length];
+                this.tool = 'pen';
+                this.updateToolbarState();
+            });
+        }
+        this.container.querySelector('[data-action="undo"]').addEventListener('click', () => this.undo());
+        this.container.querySelector('[data-action="redo"]').addEventListener('click', () => this.redo());
+        this.container.querySelector('[data-action="guide"]').addEventListener('click', () => this.cycleGuide());
+        this.container.querySelector('[data-action="pencil"]').addEventListener('click', () => this.togglePencilOnly());
+        this.container.querySelector('[data-action="fullscreen"]').addEventListener('click', () => this.toggleFullscreen());
+        this.container.querySelector('[data-action="clear"]').addEventListener('click', () => this.clearWithConfirm());
+        this.container.querySelector('[data-action="shrink"]').addEventListener('click', () => this.shrinkHeight());
+        this.container.querySelector('[data-action="expand"]').addEventListener('click', () => this.expandHeight());
+
+        // Pointer Events til pen / touch / mus
+        this.canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
+        this.canvas.addEventListener('pointermove', (e) => this.onPointerMove(e));
+        this.canvas.addEventListener('pointerup', (e) => this.onPointerUp(e));
+        this.canvas.addEventListener('pointercancel', (e) => this.onPointerUp(e));
+
+        // Undgå iOS Safari tekstmarkering under tegning
+        this.canvas.addEventListener('touchstart', (e) => {
+            if (!this.pencilOnly) e.preventDefault();
+        }, { passive: false });
+    }
+
+    resizeCanvas() {
+        const w = this.logicalW * this.scale;
+        const h = this.logicalH * this.scale;
+        this.canvas.width = w;
+        this.canvas.height = h;
+        this.canvas.style.aspectRatio = `${this.logicalW} / ${this.logicalH}`;
+
+        if (this.committedCanvas) {
+            this.committedCanvas.width = w;
+            this.committedCanvas.height = h;
+        }
+
+        if (this.guideCanvas) {
+            this.guideCanvas.width = w;
+            this.guideCanvas.height = h;
+            this.drawGuides();
+        }
+    }
+
+    drawGuides() {
+        if (!this.guideCtx) return;
+        const ctx = this.guideCtx;
+        const w = this.logicalW * this.scale;
+        const h = this.logicalH * this.scale;
+        ctx.clearRect(0, 0, w, h);
+        if (this.guide === 'blank') return;
+
+        ctx.save();
+        ctx.scale(this.scale, this.scale);
+        if (this.guide === 'lines') {
+            // Præcis 32px linjeafstand så hver grundlinje flugter med .log-entry på logbogen
+            ctx.strokeStyle = 'rgba(110, 102, 92, 0.22)';
+            ctx.lineWidth = 1;
+            for (let y = this.lineHeight; y <= this.logicalH; y += this.lineHeight) {
+                const py = y - 0.5;
+                ctx.beginPath();
+                ctx.moveTo(0, py);
+                ctx.lineTo(this.logicalW, py);
+                ctx.stroke();
+            }
+        } else if (this.guide === 'dots') {
+            ctx.fillStyle = 'rgba(100, 94, 84, 0.32)';
+            for (let y = this.lineHeight; y <= this.logicalH; y += this.lineHeight) {
+                for (let x = 22; x < this.logicalW; x += 24) {
+                    ctx.beginPath();
+                    ctx.arc(x, y - 0.5, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        ctx.restore();
+    }
+
+    getPointFromEvent(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * this.logicalW;
+        const y = ((e.clientY - rect.top) / rect.height) * this.logicalH;
+        let p = 0.5;
+        if (e.pointerType === 'pen' && typeof e.pressure === 'number' && e.pressure > 0) {
+            p = Math.max(0.15, Math.min(1.0, e.pressure));
+        }
+        const rx = Math.round(x * 10) / 10;
+        const ry = Math.round(y * 10) / 10;
+        const rp = Math.round(p * 100) / 100;
+
+        // Gem hældning (tilt) ved blyant, så Apple Pencil kan skyggelægge med siden af pennen
+        if (this.tool === 'pen' && this.penStyle === 'pencil' && e.pointerType === 'pen') {
+            const tx = typeof e.tiltX === 'number' ? e.tiltX : 0;
+            const ty = typeof e.tiltY === 'number' ? e.tiltY : 0;
+            let tilt = Math.min(1, Math.hypot(tx, ty) / 68);
+            if (tilt === 0 && typeof e.altitudeAngle === 'number' && e.altitudeAngle > 0 && e.altitudeAngle < Math.PI / 2) {
+                tilt = Math.min(1, Math.max(0, 1 - (e.altitudeAngle / (Math.PI / 2))));
+            }
+            const angle = Math.atan2(ty, tx);
+            return [rx, ry, rp, Math.round(tilt * 100) / 100, Math.round(angle * 100) / 100];
+        }
+        return [rx, ry, rp];
+    }
+
+    onPointerDown(e) {
+        if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
+        if (this.pencilOnly && e.pointerType !== 'pen') return;
+        if (this.activePointerId !== null) return;
+
+        e.preventDefault();
+        this.activePointerId = e.pointerId;
+        try { this.canvas.setPointerCapture(e.pointerId); } catch (_) {}
+
+        const pt = this.getPointFromEvent(e);
+        this.currentStroke = {
+            tool: this.tool,
+            style: this.penStyle,
+            color: this.color,
+            size: this.tool === 'eraser' ? 22 : this.size,
+            points: [pt]
+        };
+        this.strokes.push(this.currentStroke);
+        this.redoStack = [];
+        this.dirty = true;
+        this.renderActiveFrame();
+    }
+
+    onPointerMove(e) {
+        if (this.activePointerId !== e.pointerId || !this.currentStroke) return;
+        e.preventDefault();
+
+        // Brug direkte pointermove (uden WebKit getCoalescedEvents, som på iPadOS kan levere punkter ude af rækkefølge)
+        const pt = this.getPointFromEvent(e);
+        const pts = this.currentStroke.points;
+        const prev = pts[pts.length - 1];
+        const dx = pt[0] - prev[0];
+        const dy = pt[1] - prev[1];
+        if (dx * dx + dy * dy < 1.8) return;
+        pts.push(pt);
+        this.renderActiveFrame();
+    }
+
+    onPointerUp(e) {
+        if (this.activePointerId !== e.pointerId) return;
+        try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+        const finished = this.currentStroke;
+        this.activePointerId = null;
+        this.currentStroke = null;
+        if (finished && this.committedCtx) {
+            this.renderStroke(this.committedCtx, finished, this.scale);
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.drawImage(this.committedCanvas, 0, 0);
+        } else {
+            this.redraw();
+        }
+        this.updateToolbarState();
+        updateHandwritingStatus(this.modeKey);
+        if (this.modeKey === 'compose' && typeof renderOgLivePreview === 'function') {
+            renderOgLivePreview();
+        }
+    }
+
+    renderActiveFrame() {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        this.ctx.clearRect(0, 0, w, h);
+        if (this.committedCanvas) {
+            this.ctx.drawImage(this.committedCanvas, 0, 0);
+        }
+        if (this.currentStroke) {
+            this.renderStroke(this.ctx, this.currentStroke, this.scale);
+        }
+    }
+
+    renderDot(ctx, stroke, pt, scale) {
+        ctx.save();
+        ctx.scale(scale, scale);
+        if (stroke.tool === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = 'rgba(0,0,0,1)';
+        } else {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = stroke.color || '#1e1c1a';
+        }
+        const p = pt[2] ?? 0.5;
+        const r = (stroke.tool === 'eraser' ? stroke.size : stroke.size * (0.55 + p * 0.75)) * 0.5;
+        ctx.beginPath();
+        ctx.arc(pt[0], pt[1], Math.max(0.65, r), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    buildInkPolygon(rawPoints, stroke) {
+        const isFountain = (stroke.style || 'fountain') !== 'fineliner';
+        const streamline = isFountain ? 0.42 : 0.28;
+        const baseR = (stroke.size || 3.2) * 0.5;
+
+        // 1. Blød udjævning (streamlining) + beskyttelse mod mikro-tilbagespring (jitter)
+        const smooth = [];
+        let runningLen = 0;
+        let lastDirX = 0, lastDirY = 0;
+        for (let i = 0; i < rawPoints.length; i++) {
+            const raw = rawPoints[i];
+            const pRaw = raw[2] ?? 0.5;
+            if (i === 0) {
+                smooth.push({ x: raw[0], y: raw[1], p: pRaw, dist: 0, len: 0 });
+                continue;
+            }
+            const prev = smooth[smooth.length - 1];
+            const t = (i === rawPoints.length - 1) ? 0.78 : (1 - streamline);
+            const sx = prev.x + (raw[0] - prev.x) * t;
+            const sy = prev.y + (raw[1] - prev.y) * t;
+            const dx = sx - prev.x;
+            const dy = sy - prev.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 0.8 && i < rawPoints.length - 1) continue;
+
+            // Ignorer pludseligt 180°-mikrohop over < 4px (forhindrer savtakket normal-flip)
+            const ux = dx / (dist || 1);
+            const uy = dy / (dist || 1);
+            if (smooth.length >= 2 && dist < 4.0 && (ux * lastDirX + uy * lastDirY) < -0.25 && i < rawPoints.length - 1) {
+                continue;
+            }
+            lastDirX = ux;
+            lastDirY = uy;
+
+            runningLen += dist;
+            const sp = prev.p + (pRaw - prev.p) * 0.34;
+            smooth.push({ x: sx, y: sy, p: sp, dist, len: runningLen });
+        }
+
+        if (smooth.length < 2) return null;
+        const totalLen = runningLen;
+        const taperStart = isFountain ? Math.min(9, totalLen * 0.22) : 0;
+        const taperEnd = isFountain ? Math.min(15, totalLen * 0.32) : 0;
+
+        // 2. Beregn dynamisk radius pr. punkt (tryk + hastighed + blød tilspidsning)
+        const radii = new Array(smooth.length);
+        let prevVel = 1.0;
+        for (let i = 0; i < smooth.length; i++) {
+            const pt = smooth[i];
+            let pressFactor = 1.0;
+            let velFactor = 1.0;
+            if (isFountain) {
+                pressFactor = 0.46 + Math.pow(pt.p, 0.85) * 0.96;
+                const rawVel = Math.max(0.68, Math.min(1.08, 1.06 - (pt.dist / (stroke.size * 4.2)) * 0.34));
+                velFactor = prevVel + (rawVel - prevVel) * 0.35;
+                prevVel = velFactor;
+            } else {
+                pressFactor = 0.88 + pt.p * 0.22;
+            }
+
+            let taper = 1.0;
+            if (taperStart > 0 && pt.len < taperStart) {
+                taper *= 0.48 + 0.52 * Math.sin((pt.len / taperStart) * Math.PI * 0.5);
+            }
+            const rem = totalLen - pt.len;
+            if (taperEnd > 0 && rem < taperEnd) {
+                taper *= 0.26 + 0.74 * Math.sin((rem / taperEnd) * Math.PI * 0.5);
+            }
+            radii[i] = Math.max(0.32, baseR * pressFactor * velFactor * taper);
+        }
+
+        // 3. Venstre og højre blækkontur med glatte normaler
+        const rightPts = [];
+        const leftPts = [];
+        let firstTx = 1, firstTy = 0;
+        let lastTx = 1, lastTy = 0;
+
+        for (let i = 0; i < smooth.length; i++) {
+            let tx = 0, ty = 0;
+            if (i > 0) {
+                const dx = smooth[i].x - smooth[i - 1].x;
+                const dy = smooth[i].y - smooth[i - 1].y;
+                const d = Math.hypot(dx, dy) || 1;
+                tx += dx / d;
+                ty += dy / d;
+            }
+            if (i < smooth.length - 1) {
+                const dx = smooth[i + 1].x - smooth[i].x;
+                const dy = smooth[i + 1].y - smooth[i].y;
+                const d = Math.hypot(dx, dy) || 1;
+                tx += dx / d;
+                ty += dy / d;
+            }
+            const tLen = Math.hypot(tx, ty);
+            if (tLen < 0.001) {
+                tx = lastTx;
+                ty = lastTy;
+            } else {
+                tx /= tLen;
+                ty /= tLen;
+            }
+            if (i === 0) { firstTx = tx; firstTy = ty; }
+            lastTx = tx;
+            lastTy = ty;
+
+            const nx = -ty;
+            const ny = tx;
+            const r = radii[i];
+            rightPts.push([smooth[i].x + nx * r, smooth[i].y + ny * r]);
+            leftPts.push([smooth[i].x - nx * r, smooth[i].y - ny * r]);
+        }
+
+        // 4. Afrundede ender ved start og slut
+        const poly = [];
+        const pStart = smooth[0];
+        const rStart = radii[0];
+        const startBaseAngle = Math.atan2(-firstTx, firstTy); // -normal
+        const capSteps = 5;
+        for (let s = 1; s < capSteps; s++) {
+            const a = startBaseAngle - (Math.PI * s) / capSteps;
+            poly.push([pStart.x + Math.cos(a) * rStart, pStart.y + Math.sin(a) * rStart]);
+        }
+
+        for (let i = 0; i < rightPts.length; i++) poly.push(rightPts[i]);
+
+        const pEnd = smooth[smooth.length - 1];
+        const rEnd = radii[radii.length - 1];
+        const endBaseAngle = Math.atan2(lastTx, -lastTy); // +normal
+        for (let s = 1; s < capSteps; s++) {
+            const a = endBaseAngle - (Math.PI * s) / capSteps;
+            poly.push([pEnd.x + Math.cos(a) * rEnd, pEnd.y + Math.sin(a) * rEnd]);
+        }
+
+        for (let i = leftPts.length - 1; i >= 0; i--) poly.push(leftPts[i]);
+        return poly;
+    }
+
+    getGraphitePattern(ctx, colorHex) {
+        if (!this._graphiteTiles) this._graphiteTiles = {};
+        const key = colorHex || '#5c5852';
+        if (!this._graphiteTiles[key]) {
+            // Deterministisk papir-korn tekstur (64x64) som giver ægte grafit-fornemmelse
+            const tile = document.createElement('canvas');
+            tile.width = 64;
+            tile.height = 64;
+            const tCtx = tile.getContext('2d');
+            tCtx.fillStyle = key;
+
+            let seed = 1337;
+            const rand = () => {
+                seed = (seed * 16807) % 2147483647;
+                return (seed - 1) / 2147483646;
+            };
+            for (let y = 0; y < 64; y++) {
+                for (let x = 0; x < 64; x++) {
+                    const n = rand();
+                    if (n > 0.34) {
+                        tCtx.globalAlpha = 0.25 + (n - 0.34) * 1.1;
+                        tCtx.fillRect(x, y, 1, 1);
+                    }
+                }
+            }
+            this._graphiteTiles[key] = tile;
+        }
+        return ctx.createPattern(this._graphiteTiles[key], 'repeat');
+    }
+
+    renderPencilStroke(ctx, stroke, scale) {
+        const pts = stroke.points;
+        if (!pts || pts.length === 0) return;
+
+        const baseSize = stroke.size || 3.2;
+        const colorHex = stroke.color || '#5c5852';
+        const pattern = this.getGraphitePattern(ctx, colorHex);
+
+        ctx.save();
+        ctx.scale(scale, scale);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = pattern || colorHex;
+
+        const drawDab = (x, y, p, tilt, angle) => {
+            // Op til ~0.35 tilt = spids blyant; over ~0.35 tilt = bred, blød skyggelægning med siden af pennen
+            const shadeFactor = Math.max(0, (tilt - 0.32) / 0.68);
+            const rx = Math.max(0.7, baseSize * (0.34 + p * 0.28 + shadeFactor * 2.1));
+            const ry = Math.max(0.6, baseSize * (0.34 + p * 0.24 + shadeFactor * 0.62));
+            const alpha = shadeFactor > 0.05
+                ? Math.min(0.42, (0.07 + p * 0.22) * (1 - shadeFactor * 0.35))
+                : Math.min(0.88, 0.36 + p * 0.45);
+
+            ctx.save();
+            ctx.translate(x, y);
+            if (shadeFactor > 0.05) {
+                ctx.rotate(angle);
+            }
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        };
+
+        if (pts.length === 1) {
+            drawDab(pts[0][0], pts[0][1], pts[0][2] ?? 0.5, pts[0][3] ?? 0, pts[0][4] ?? 0);
+            ctx.restore();
+            return;
+        }
+
+        for (let i = 1; i < pts.length; i++) {
+            const p0 = pts[i - 1];
+            const p1 = pts[i];
+            const dx = p1[0] - p0[0];
+            const dy = p1[1] - p0[1];
+            const dist = Math.hypot(dx, dy);
+            const tiltAvg = ((p0[3] ?? 0) + (p1[3] ?? 0)) * 0.5;
+            const stepLen = tiltAvg > 0.35 ? 1.8 : 0.9;
+            const steps = Math.max(1, Math.ceil(dist / stepLen));
+
+            for (let s = 0; s <= steps; s++) {
+                const t = s / steps;
+                const x = p0[0] + dx * t;
+                const y = p0[1] + dy * t;
+                const p = (p0[2] ?? 0.5) + ((p1[2] ?? 0.5) - (p0[2] ?? 0.5)) * t;
+                const tilt = (p0[3] ?? 0) + ((p1[3] ?? 0) - (p0[3] ?? 0)) * t;
+                const ang = (p0[4] ?? 0) + ((p1[4] ?? 0) - (p0[4] ?? 0)) * t;
+                drawDab(x, y, p, tilt, ang);
+            }
+        }
+        ctx.restore();
+    }
+
+    renderStroke(ctx, stroke, scale) {
+        const pts = stroke.points;
+        if (!pts || pts.length === 0) return;
+
+        // Viskelæder tegnes som blød, jævn destination-out streg
+        if (stroke.tool === 'eraser') {
+            ctx.save();
+            ctx.scale(scale, scale);
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.strokeStyle = 'rgba(0,0,0,1)';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = stroke.size || 22;
+            ctx.beginPath();
+            ctx.moveTo(pts[0][0], pts[0][1]);
+            for (let i = 1; i < pts.length; i++) {
+                const prev = pts[i - 1];
+                const cur = pts[i];
+                ctx.quadraticCurveTo(prev[0], prev[1], (prev[0] + cur[0]) * 0.5, (prev[1] + cur[1]) * 0.5);
+            }
+            const last = pts[pts.length - 1];
+            ctx.lineTo(last[0], last[1]);
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
+
+        // Blyant (grafit-korn + skyggelægning ved hældning af Apple Pencil)
+        if (stroke.style === 'pencil') {
+            this.renderPencilStroke(ctx, stroke, scale);
+            return;
+        }
+
+        if (pts.length === 1) {
+            this.renderDot(ctx, stroke, pts[0], scale);
+            return;
+        }
+
+        const poly = this.buildInkPolygon(pts, stroke);
+        if (!poly || poly.length < 3) {
+            this.renderDot(ctx, stroke, pts[0], scale);
+            return;
+        }
+
+        // Fyld sammenhængende, glat blækform med kvadratiske Bézier-midtpunkter
+        ctx.save();
+        ctx.scale(scale, scale);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = stroke.color || '#1e1c1a';
+        ctx.beginPath();
+        const len = poly.length;
+        const firstMidX = (poly[len - 1][0] + poly[0][0]) * 0.5;
+        const firstMidY = (poly[len - 1][1] + poly[0][1]) * 0.5;
+        ctx.moveTo(firstMidX, firstMidY);
+        for (let i = 0; i < len; i++) {
+            const cur = poly[i];
+            const next = poly[(i + 1) % len];
+            ctx.quadraticCurveTo(cur[0], cur[1], (cur[0] + next[0]) * 0.5, (cur[1] + next[1]) * 0.5);
+        }
+        ctx.closePath();
+        ctx.fill('nonzero');
+        ctx.restore();
+    }
+
+    redraw(targetCtx = this.ctx, targetScale = this.scale) {
+        const w = this.logicalW * targetScale;
+        const h = this.logicalH * targetScale;
+        if (targetCtx === this.ctx && this.committedCtx) {
+            this.committedCtx.clearRect(0, 0, w, h);
+            for (const stroke of this.strokes) {
+                this.renderStroke(this.committedCtx, stroke, targetScale);
+            }
+            this.ctx.clearRect(0, 0, w, h);
+            this.ctx.drawImage(this.committedCanvas, 0, 0);
+            return;
+        }
+        targetCtx.clearRect(0, 0, w, h);
+        for (const stroke of this.strokes) {
+            this.renderStroke(targetCtx, stroke, targetScale);
+        }
+    }
+
+    undo() {
+        if (this.strokes.length === 0) return;
+        this.redoStack.push(this.strokes.pop());
+        this.dirty = true;
+        this.redraw();
+        this.updateToolbarState();
+        updateHandwritingStatus(this.modeKey);
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) return;
+        this.strokes.push(this.redoStack.pop());
+        this.dirty = true;
+        this.redraw();
+        this.updateToolbarState();
+        updateHandwritingStatus(this.modeKey);
+    }
+
+    clearWithConfirm() {
+        if (this.strokes.length === 0) return;
+        if (!confirm('Ryd hele det håndskrevne ark?')) return;
+        this.strokes = [];
+        this.redoStack = [];
+        this.dirty = true;
+        this.redraw();
+        this.updateToolbarState();
+        updateHandwritingStatus(this.modeKey);
+    }
+
+    reset() {
+        this.strokes = [];
+        this.redoStack = [];
+        this.logicalW = 644;
+        this.logicalH = 12 * this.lineHeight;
+        this.dirty = false;
+        if (this.isFullscreen) this.toggleFullscreen(false);
+        this.resizeCanvas();
+        this.redraw();
+        this.updateToolbarState();
+        updateHandwritingStatus(this.modeKey);
+    }
+
+    getLowestInkY() {
+        let maxY = 0;
+        for (const s of this.strokes) {
+            if (s.tool === 'eraser' || !s.points) continue;
+            for (const pt of s.points) {
+                if (pt[1] > maxY) maxY = pt[1];
+            }
+        }
+        return maxY;
+    }
+
+    shrinkHeight() {
+        const minH = this.minLines * this.lineHeight;
+        const lowestInk = this.getLowestInkY();
+        const safeMinH = lowestInk > 0
+            ? Math.max(minH, (Math.ceil(lowestInk / this.lineHeight) + 1) * this.lineHeight)
+            : minH;
+        const targetH = Math.max(safeMinH, this.logicalH - 4 * this.lineHeight);
+        if (targetH >= this.logicalH) return;
+        this.logicalH = targetH;
+        this.dirty = true;
+        this.resizeCanvas();
+        this.redraw();
+        this.updateToolbarState();
+    }
+
+    expandHeight() {
+        const maxH = this.maxLines * this.lineHeight;
+        if (this.logicalH >= maxH) return;
+        this.logicalH = Math.min(maxH, this.logicalH + 4 * this.lineHeight);
+        this.dirty = true;
+        this.resizeCanvas();
+        this.redraw();
+        this.updateToolbarState();
+    }
+
+    cycleGuide() {
+        const order = ['lines', 'dots', 'blank'];
+        this.guide = order[(order.indexOf(this.guide) + 1) % order.length];
+        this.drawGuides();
+        this.updateToolbarState();
+    }
+
+    togglePencilOnly() {
+        this.pencilOnly = !this.pencilOnly;
+        this.canvas.style.touchAction = this.pencilOnly ? 'pan-y' : 'none';
+        this.updateToolbarState();
+    }
+
+    toggleFullscreen(forceState) {
+        const next = (typeof forceState === 'boolean') ? forceState : !this.isFullscreen;
+        this.isFullscreen = next;
+        this.container.classList.toggle('hw-fullscreen', next);
+        document.body.style.overflow = next ? 'hidden' : '';
+        this.updateToolbarState();
+    }
+
+    updateToolbarState() {
+        this.container.querySelectorAll('.hw-swatch').forEach(btn => {
+            btn.classList.toggle('active', this.tool === 'pen' && btn.dataset.color === this.color);
+        });
+        this.container.querySelectorAll('[data-size]').forEach(btn => {
+            btn.classList.toggle('active', this.tool === 'pen' && parseFloat(btn.dataset.size) === this.size);
+        });
+        const eraserBtn = this.container.querySelector('[data-tool="eraser"]');
+        if (eraserBtn) eraserBtn.classList.toggle('active', this.tool === 'eraser');
+
+        const penStyleBtn = this.container.querySelector('[data-action="penstyle"]');
+        if (penStyleBtn) {
+            const labels = { fountain: 'Fyldepen', fineliner: 'Fineliner', pencil: 'Blyant' };
+            penStyleBtn.textContent = labels[this.penStyle] || 'Fyldepen';
+            penStyleBtn.classList.toggle('active', this.tool === 'pen');
+        }
+
+        const undoBtn = this.container.querySelector('[data-action="undo"]');
+        const redoBtn = this.container.querySelector('[data-action="redo"]');
+        if (undoBtn) undoBtn.disabled = this.strokes.length === 0;
+        if (redoBtn) redoBtn.disabled = this.redoStack.length === 0;
+
+        const guideBtn = this.container.querySelector('[data-action="guide"]');
+        if (guideBtn) {
+            guideBtn.textContent = this.guide === 'lines' ? 'Linjer' : (this.guide === 'dots' ? 'Prikker' : 'Blank');
+        }
+
+        const pencilBtn = this.container.querySelector('[data-action="pencil"]');
+        if (pencilBtn) {
+            pencilBtn.classList.toggle('active', this.pencilOnly);
+            pencilBtn.textContent = this.pencilOnly ? '✎ Kun Pencil' : '✎ Pencil';
+        }
+
+        const fsBtn = this.container.querySelector('[data-action="fullscreen"]');
+        if (fsBtn) {
+            fsBtn.textContent = this.isFullscreen ? '✓ Færdig' : '⤢ Fuld';
+            fsBtn.classList.toggle('active', this.isFullscreen);
+        }
+
+        const linesCount = Math.round(this.logicalH / this.lineHeight);
+        if (this.linesLabelEl) {
+            this.linesLabelEl.textContent = `${linesCount} linjer`;
+        }
+
+        const shrinkBtn = this.container.querySelector('[data-action="shrink"]');
+        if (shrinkBtn) {
+            const minH = this.minLines * this.lineHeight;
+            const lowestInk = this.getLowestInkY();
+            const safeMinH = lowestInk > 0
+                ? Math.max(minH, (Math.ceil(lowestInk / this.lineHeight) + 1) * this.lineHeight)
+                : minH;
+            shrinkBtn.disabled = this.logicalH <= safeMinH;
+        }
+
+        const expandBtn = this.container.querySelector('[data-action="expand"]');
+        if (expandBtn) expandBtn.disabled = this.logicalH >= this.maxLines * this.lineHeight;
+
+        if (this.hintEl) {
+            this.hintEl.textContent = this.pencilOnly
+                ? 'Kun Apple Pencil tegner · fingre scroller arket'
+                : 'Linjerne matcher logbogens papir 1:1';
+        }
+    }
+
+    hasInk() {
+        return this.strokes.some(s => s.tool !== 'eraser' && s.points && s.points.length > 0);
+    }
+
+    exportJson() {
+        return {
+            v: 2,
+            width: this.logicalW,
+            height: this.logicalH,
+            lineHeight: this.lineHeight,
+            strokes: this.strokes
+        };
+    }
+
+    loadJson(data) {
+        if (!data || typeof data !== 'object') return;
+        this.logicalW = Number(data.width) || 644;
+        const minH = this.minLines * this.lineHeight;
+        const maxH = this.maxLines * this.lineHeight;
+        const rawH = Math.max(minH, Math.min(maxH, Number(data.height) || (12 * this.lineHeight)));
+        this.logicalH = Math.ceil(rawH / this.lineHeight) * this.lineHeight;
+        this.strokes = Array.isArray(data.strokes) ? data.strokes : [];
+        this.redoStack = [];
+        this.resizeCanvas();
+        this.redraw();
+        this.updateToolbarState();
+    }
+
+    exportPngDataUrl() {
+        if (!this.hasInk()) return null;
+
+        const exScale = this.exportScale || 3;
+        const fullW = this.logicalW * exScale;
+        const fullH = this.logicalH * exScale;
+        const off = document.createElement('canvas');
+        off.width = fullW;
+        off.height = fullH;
+        const offCtx = off.getContext('2d');
+        this.redraw(offCtx, exScale);
+
+        // Beskær tom top/bund til præcise hele 32px-linjer, så blækket flugter med logbogens linjer
+        const imgData = offCtx.getImageData(0, 0, fullW, fullH).data;
+        let minY = fullH;
+        let maxY = -1;
+        for (let y = 0; y < fullH; y += 2) {
+            const rowOffset = y * fullW * 4;
+            for (let x = 0; x < fullW; x += 4) {
+                if (imgData[rowOffset + x * 4 + 3] > 8) {
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                    break;
+                }
+            }
+        }
+        if (maxY < 0) return null;
+
+        const linePx = this.lineHeight * exScale; // 96px ved 3x retina
+        const cropY = Math.max(0, Math.floor(minY / linePx) * linePx);
+        const cropBottom = Math.min(fullH, Math.ceil((maxY + 12) / linePx) * linePx);
+        const cropH = Math.max(linePx * 2, cropBottom - cropY);
+
+        const cropped = document.createElement('canvas');
+        cropped.width = fullW;
+        cropped.height = cropH;
+        const cCtx = cropped.getContext('2d');
+        cCtx.drawImage(off, 0, cropY, fullW, cropH, 0, 0, fullW, cropH);
+
+        return cropped.toDataURL('image/png');
+    }
+}
+
+const handwritingPads = {};
+
+function getHandwritingPad(modeKey) {
+    if (!handwritingPads[modeKey]) {
+        const panelId = modeKey === 'edit' ? 'editHwPanel' : 'composeHwPanel';
+        const el = document.getElementById(panelId);
+        if (!el) return null;
+        handwritingPads[modeKey] = new HandwritingPad(el, modeKey);
+    }
+    return handwritingPads[modeKey];
+}
+
+function toggleHandwritingPanel(modeKey) {
+    const panelId = modeKey === 'edit' ? 'editHwPanel' : 'composeHwPanel';
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    const isOpen = panel.style.display !== 'none';
+    if (isOpen) {
+        closeHandwritingPanel(modeKey);
+    } else {
+        getHandwritingPad(modeKey);
+        panel.style.display = 'block';
+        updateHandwritingStatus(modeKey);
+    }
+}
+
+function closeHandwritingPanel(modeKey) {
+    const panelId = modeKey === 'edit' ? 'editHwPanel' : 'composeHwPanel';
+    const panel = document.getElementById(panelId);
+    const pad = handwritingPads[modeKey];
+    if (pad && pad.isFullscreen) pad.toggleFullscreen(false);
+    if (panel) panel.style.display = 'none';
+    updateHandwritingStatus(modeKey);
+}
+
+function updateHandwritingStatus(modeKey) {
+    const statusEl = document.getElementById(modeKey === 'edit' ? 'editHwStatus' : 'composeHwStatus');
+    const toggleBtn = document.getElementById(modeKey === 'edit' ? 'editHwToggleBtn' : 'composeHwToggleBtn');
+    const panel = document.getElementById(modeKey === 'edit' ? 'editHwPanel' : 'composeHwPanel');
+    const pad = handwritingPads[modeKey];
+    const isOpen = panel && panel.style.display !== 'none';
+    const hasInk = pad ? pad.hasInk() : false;
+
+    if (statusEl) {
+        statusEl.textContent = hasInk ? '✓ Håndskrift klar' : '';
+    }
+    if (toggleBtn) {
+        if (isOpen) {
+            toggleBtn.textContent = 'Skjul tegneflade';
+        } else if (hasInk) {
+            toggleBtn.textContent = '✎ Ret håndskrift';
+        } else {
+            toggleBtn.textContent = modeKey === 'edit' ? '✎ Tilføj håndskrift' : '✎ Skriv / tegn i hånden';
+        }
+    }
 }
 
 // Kør ved start

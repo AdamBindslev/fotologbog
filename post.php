@@ -213,6 +213,19 @@ $nextPost = $adjacent['next'];
                         </div>
                     <?php endif; ?>
 
+                    <?php if (!empty($post['handwriting_image'])):
+                        $hwUrl = UPLOADS_URL . '/' . rawurlencode(basename($post['handwriting_image']));
+                        $hwHasPhoto = !empty($postImages);
+                    ?>
+                        <div class="entry-handwriting <?= $hwHasPhoto ? 'has-photo-above' : 'is-standalone' ?>">
+                            <img
+                                src="<?= htmlspecialchars($hwUrl) ?>"
+                                alt="Håndskreven note: <?= htmlspecialchars($post['title']) ?>"
+                                class="entry-handwriting-img"
+                            >
+                        </div>
+                    <?php endif; ?>
+
                     <footer class="entry-meta">
                         <div class="meta-bottom">
                             <div class="meta-tags">
@@ -519,6 +532,49 @@ if (document.readyState === 'complete') {
             }
         });
     }
+})();
+
+// Lås håndskriftens grundlinjer til logbogens 32px-papirlinjer
+(function alignHandwritingToRules() {
+    function alignAll() {
+        document.querySelectorAll('.entry-handwriting').forEach(wrap => {
+            const img = wrap.querySelector('.entry-handwriting-img');
+            const entry = wrap.closest('.log-entry');
+            if (!img || !entry || !img.naturalWidth || !img.naturalHeight) return;
+
+            const renderedW = img.clientWidth;
+            const renderedH = img.clientHeight;
+            if (!renderedW || !renderedH) return;
+
+            const hwScale = Math.max(1, Math.round(img.naturalWidth / 644));
+            const expectedLogicalW = img.naturalWidth / hwScale;
+            const linePx = 32 * hwScale;
+            const isOneToOne = Math.abs(renderedW - expectedLogicalW) <= 6;
+
+            if (isOneToOne && img.naturalHeight % linePx === 0) {
+                wrap.classList.remove('is-scaled-ruled');
+                wrap.style.removeProperty('--hw-line-h');
+                wrap.style.marginTop = '32px';
+                const rem = wrap.offsetTop % 32;
+                if (rem !== 0) {
+                    wrap.style.marginTop = (32 + (32 - rem)) + 'px';
+                }
+            } else if (img.naturalHeight % linePx === 0) {
+                const lines = img.naturalHeight / linePx;
+                const scaledLineH = renderedH / lines;
+                wrap.style.marginTop = '24px';
+                wrap.style.setProperty('--hw-line-h', scaledLineH.toFixed(2) + 'px');
+                wrap.classList.add('is-scaled-ruled');
+            }
+        });
+    }
+
+    document.querySelectorAll('.entry-handwriting-img').forEach(img => {
+        if (!img.complete) img.addEventListener('load', alignAll);
+    });
+    window.addEventListener('load', alignAll);
+    window.addEventListener('resize', alignAll);
+    if (document.readyState !== 'loading') alignAll();
 })();
 </script>
 

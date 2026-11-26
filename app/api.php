@@ -138,6 +138,22 @@ if ($action === 'create_post') {
         $title = 'Log ' . date('d.m.Y', strtotime($publishedAt));
     }
 
+    // Håndskrift (valgfrit – kan bruges under et foto eller helt uden foto)
+    $handwritingImageData = trim((string)($input['handwriting_image_data'] ?? ''));
+    $handwritingDataRaw = $input['handwriting_data'] ?? null;
+    $handwritingDataJson = null;
+    if (is_array($handwritingDataRaw)) {
+        $handwritingDataJson = json_encode($handwritingDataRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    } elseif (is_string($handwritingDataRaw) && trim($handwritingDataRaw) !== '') {
+        $decodedHw = json_decode($handwritingDataRaw, true);
+        if (is_array($decodedHw)) {
+            $handwritingDataJson = json_encode($decodedHw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+    if ($handwritingDataJson !== null && strlen($handwritingDataJson) > 3 * 1024 * 1024) {
+        json_reply(['error' => 'Håndskriftsdata er for store (maks 3 MB)'], 400);
+    }
+
     // Billede(r) kan komme som images_data (array op til 3), image_data (base64) eller $_FILES
     $rawImages = [];
     if (!empty($input['images_data']) && is_array($input['images_data'])) {
@@ -148,11 +164,12 @@ if ($action === 'create_post') {
         $rawImages = [$_FILES['image']];
     }
 
-    if (empty($rawImages)) {
-        json_reply(['error' => 'Du skal uploade mindst ét billede'], 400);
+    if (empty($rawImages) && $handwritingImageData === '') {
+        json_reply(['error' => 'Du skal enten uploade mindst ét billede eller lave en håndskreven indførsel'], 400);
     }
 
     $savedPaths = [];
+    $handwritingImagePath = null;
     try {
         foreach ($rawImages as $imgItem) {
             if (!empty($imgItem)) {
@@ -161,17 +178,23 @@ if ($action === 'create_post') {
                 $savedPaths[] = $p;
             }
         }
+        if ($handwritingImageData !== '') {
+            $handwritingImagePath = save_image_data($handwritingImageData);
+        }
     } catch (Exception $e) {
         foreach ($savedPaths as $sp) {
             delete_uploaded_image($sp);
         }
+        if ($handwritingImagePath) {
+            delete_uploaded_image($handwritingImagePath);
+        }
         json_reply(['error' => $e->getMessage()], 400);
     }
 
-    if (empty($savedPaths)) {
-        json_reply(['error' => 'Du skal uploade mindst ét gyldigt billede'], 400);
+    if (empty($savedPaths) && empty($handwritingImagePath)) {
+        json_reply(['error' => 'Du skal enten uploade mindst ét gyldigt billede eller gemme håndskrift'], 400);
     }
-    $imagePath = $savedPaths[0];
+    $imagePath = $savedPaths[0] ?? '';
 
     // Håndter EXIF-data (kan sendes fra app'en eller udtrækkes fra primær billedfil)
     $exifCamera = trim((string)($input['exif_camera'] ?? ''));
@@ -181,7 +204,7 @@ if ($action === 'create_post') {
     $exifShutter = trim((string)($input['exif_shutter'] ?? ''));
     $exifIso = trim((string)($input['exif_iso'] ?? ''));
 
-    if (empty($exifCamera) && empty($exifLens) && empty($exifFocal) && empty($exifAperture) && empty($exifShutter) && empty($exifIso)) {
+    if ($imagePath !== '' && empty($exifCamera) && empty($exifLens) && empty($exifFocal) && empty($exifAperture) && empty($exifShutter) && empty($exifIso)) {
         $extractedExif = extract_exif_from_image_file(UPLOADS_DIR . '/' . $imagePath);
         $exifCamera = $extractedExif['camera'] ?? null;
         $exifLens = $extractedExif['lens'] ?? null;
@@ -212,11 +235,13 @@ if ($action === 'create_post') {
 
     $stmt = $db->prepare("
         INSERT INTO posts (
-            uid, title, slug, content, image_path, location, latitude, longitude, published_at, status,
+            uid, title, slug, content, image_path, handwriting_image, handwriting_data,
+            location, latitude, longitude, published_at, status,
             og_style, exif_camera, exif_lens, exif_focal, exif_aperture, exif_shutter, exif_iso, created_at, updated_at
         )
         VALUES (
-            :uid, :title, :slug, :content, :image_path, :location, :latitude, :longitude, :published_at, :status,
+            :uid, :title, :slug, :content, :image_path, :handwriting_image, :handwriting_data,
+            :location, :latitude, :longitude, :published_at, :status,
             :og_style, :exif_camera, :exif_lens, :exif_focal, :exif_aperture, :exif_shutter, :exif_iso, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
     ");
@@ -227,6 +252,8 @@ if ($action === 'create_post') {
         ':slug' => $slug,
         ':content' => $content,
         ':image_path' => $imagePath,
+        ':handwriting_image' => $handwritingImagePath,
+        ':handwriting_data' => $handwritingImagePath ? $handwritingDataJson : null,
         ':location' => $location,
         ':latitude' => $latitude,
         ':longitude' => $longitude,
@@ -280,6 +307,8 @@ if ($action === 'get_posts') {
         $p['tags'] = get_post_tags((int)$p['id']);
         $p['images'] = get_post_images((int)$p['id'], $p['image_path'] ?? null);
         $p['exif_formatted'] = format_exif($p);
+        $p['has_handwriting'] = !empty($p['handwriting_image']);
+        unset($p['handwriting_data']);
     }
     unset($p);
 
@@ -387,8 +416,48 @@ if ($action === 'update_post') {
         }
     }
 
-    if (empty($finalImages)) {
-        json_reply(['error' => 'Et indlæg skal have mindst ét billede'], 400);
+    if (!empty($input['remove_images'])) {
+        $finalImages = [];
+    }
+
+    // Håndter opdatering eller fjernelse af håndskrift
+    $currentHwImage = $post['handwriting_image'] ?? null;
+    $finalHwImage = $currentHwImage;
+    $finalHwData = $post['handwriting_data'] ?? null;
+    $newHwImageSaved = null;
+
+    if (!empty($input['clear_handwriting'])) {
+        $finalHwImage = null;
+        $finalHwData = null;
+    } elseif (!empty($input['handwriting_image_data'])) {
+        $hwImgData = trim((string)$input['handwriting_image_data']);
+        $hwDataRaw = $input['handwriting_data'] ?? null;
+        $hwDataJson = null;
+        if (is_array($hwDataRaw)) {
+            $hwDataJson = json_encode($hwDataRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } elseif (is_string($hwDataRaw) && trim($hwDataRaw) !== '') {
+            $decodedHw = json_decode($hwDataRaw, true);
+            if (is_array($decodedHw)) {
+                $hwDataJson = json_encode($decodedHw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+        }
+        if ($hwDataJson !== null && strlen($hwDataJson) > 3 * 1024 * 1024) {
+            json_reply(['error' => 'Håndskriftsdata er for store (maks 3 MB)'], 400);
+        }
+        try {
+            $newHwImageSaved = save_image_data($hwImgData);
+            $finalHwImage = $newHwImageSaved;
+            $finalHwData = $hwDataJson;
+        } catch (Exception $e) {
+            json_reply(['error' => 'Kunne ikke gemme håndskrift: ' . $e->getMessage()], 400);
+        }
+    }
+
+    if (empty($finalImages) && empty($finalHwImage)) {
+        if ($newHwImageSaved) {
+            delete_uploaded_image($newHwImageSaved);
+        }
+        json_reply(['error' => 'Et indlæg skal have mindst ét billede eller en håndskreven note'], 400);
     }
 
     // Slet billedfiler der blev fjernet
@@ -397,7 +466,10 @@ if ($action === 'update_post') {
             delete_uploaded_image($oldImg);
         }
     }
-    $imagePath = $finalImages[0];
+    if (!empty($currentHwImage) && $currentHwImage !== $finalHwImage) {
+        delete_uploaded_image($currentHwImage);
+    }
+    $imagePath = $finalImages[0] ?? '';
 
     $validStyles = ['polaroid', 'darkroom', 'notebook', 'raw'];
     $ogStyle = isset($input['og_style']) ? trim((string)$input['og_style']) : ($post['og_style'] ?? 'notebook');
@@ -416,6 +488,8 @@ if ($action === 'update_post') {
             published_at = :published_at, 
             status = :status,
             image_path = :image_path,
+            handwriting_image = :handwriting_image,
+            handwriting_data = :handwriting_data,
             og_style = :og_style,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = :id
@@ -430,6 +504,8 @@ if ($action === 'update_post') {
         ':published_at' => $publishedAt,
         ':status' => $status,
         ':image_path' => $imagePath,
+        ':handwriting_image' => $finalHwImage,
+        ':handwriting_data' => $finalHwData,
         ':og_style' => $ogStyle,
         ':id' => $id
     ]);
@@ -499,6 +575,9 @@ if ($action === 'delete_post') {
     $allImgs = get_post_images($id, $post['image_path'] ?? null);
     foreach ($allImgs as $imgP) {
         delete_uploaded_image($imgP);
+    }
+    if (!empty($post['handwriting_image'])) {
+        delete_uploaded_image($post['handwriting_image']);
     }
     delete_og_image_cache($post['uid'] ?? (string)$id);
 
@@ -617,7 +696,7 @@ if ($action === 'get_postcards') {
     $db = get_db();
     $stmt = $db->query("
         SELECT pc.id, pc.post_id, pc.kind, pc.sender_name, pc.sender_contact, pc.message, pc.is_read, pc.created_at,
-               p.title AS post_title, p.uid AS post_uid, p.image_path AS post_image_path, p.published_at AS post_published_at
+               p.title AS post_title, p.uid AS post_uid, p.image_path AS post_image_path, p.handwriting_image AS post_handwriting_image, p.published_at AS post_published_at
         FROM postcards pc
         INNER JOIN posts p ON p.id = pc.post_id
         ORDER BY pc.created_at DESC, pc.id DESC
@@ -632,7 +711,9 @@ if ($action === 'get_postcards') {
         $r['id'] = (int)$r['id'];
         $r['post_id'] = (int)$r['post_id'];
         $r['is_read'] = (int)$r['is_read'];
-        $r['post_thumb_url'] = !empty($r['post_image_path']) ? get_thumbnail_url($r['post_image_path']) : '';
+        $r['post_thumb_url'] = !empty($r['post_image_path'])
+            ? get_thumbnail_url($r['post_image_path'])
+            : (!empty($r['post_handwriting_image']) ? (UPLOADS_URL . '/' . rawurlencode(basename($r['post_handwriting_image']))) : '');
         $r['post_url'] = get_post_url([
             'id' => $r['post_id'],
             'uid' => $r['post_uid'],

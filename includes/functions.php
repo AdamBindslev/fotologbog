@@ -719,7 +719,7 @@ function delete_og_image_cache(?string $identifier): void {
  * Returnerer fulde sociale metadata (og:image) til et indlæg baseret på dets valgte stil.
  */
 function get_post_og_meta(array $post): ?array {
-    if (empty($post['image_path'])) {
+    if (empty($post['image_path']) && empty($post['handwriting_image'])) {
         return null;
     }
     $uid = !empty($post['uid']) ? $post['uid'] : (string)$post['id'];

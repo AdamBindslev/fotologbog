@@ -76,32 +76,7 @@
     --font-serif: 'Fraunces', Georgia, serif;
     --font-typewriter: 'Courier Prime', Courier, 'Courier New', monospace;
     --font-mono: 'Courier Prime', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-    :root {
-        --desk-bg: #141210;
-        --cover-kraft: #6e3e26;
-        --cover-kraft-dark: #522c19;
-        --cover-kraft-light: #824b30;
-        --cover-border: #3b1e10;
-
-        --sheet-paper: #22201d;
-        --sheet-paper-tint: #1b1917;
-        --sheet-border: #38342e;
-        --sheet-rule: rgba(255, 255, 255, 0.05);
-
-        --ink-black: #f0ebe2;
-        --ink-dark: #dfd8cc;
-        --ink-muted: #a69c8f;
-        --ink-faint: #6c645b;
-        --ink-red: #e05341;
-        --ink-red-faint: rgba(224, 83, 65, 0.18);
-
-        --wire-dark: #11100f;
-        --wire-silver: #55504a;
-        --wire-shine: #8c847a;
-    }
+    color-scheme: light;
 }
 
 * {
@@ -598,6 +573,41 @@ body {
     font-style: italic;
     line-height: 32px;
     color: var(--ink-muted);
+}
+
+/* =========================================================
+   Håndskreven indførsel / skitse (blæk direkte på papirets 32px-linjer)
+   ========================================================= */
+.entry-handwriting {
+    margin: 32px 0 0 0;
+    padding: 0;
+    line-height: 0;
+}
+
+.entry-handwriting.is-standalone {
+    margin-top: 32px;
+}
+
+.entry-handwriting.is-scaled-ruled {
+    background-color: var(--sheet-paper);
+    background-image: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(var(--hw-line-h, 32px) - 1px),
+        var(--sheet-rule) calc(var(--hw-line-h, 32px) - 1px),
+        var(--sheet-rule) var(--hw-line-h, 32px)
+    );
+    background-position: 0 0;
+}
+
+.entry-handwriting-img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    mix-blend-mode: multiply;
+    user-select: none;
+    -webkit-user-drag: none;
 }
 
 /* =========================================================
@@ -1342,6 +1352,39 @@ body {
     object-fit: cover;
     display: block;
     filter: contrast(1.02);
+}
+
+.contact-cell-handwriting {
+    background-color: #f9f7f1 !important;
+    background-image: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 11px,
+        rgba(110, 102, 92, 0.24) 11px,
+        rgba(110, 102, 92, 0.24) 12px
+    );
+}
+
+.contact-thumb-handwriting {
+    background: transparent;
+    object-fit: contain;
+    object-position: center center;
+    padding: 14px 4px 12px 4px;
+    mix-blend-mode: multiply;
+}
+
+.contact-hw-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 5px;
+    font-size: 0.72rem;
+    line-height: 1;
+    color: #5c5449;
+    background: rgba(249, 247, 241, 0.88);
+    padding: 2px 4px;
+    border-radius: 2px;
+    border: 1px solid rgba(110, 102, 92, 0.28);
+    pointer-events: none;
 }
 
 .contact-day-num {

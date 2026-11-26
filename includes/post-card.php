@@ -119,6 +119,20 @@ $analogStamp = format_analog_header($post['published_at'], $post['location'] ?? 
         </div>
     <?php endif; ?>
 
+    <?php if (!empty($post['handwriting_image'])):
+        $hwUrl = UPLOADS_URL . '/' . rawurlencode(basename($post['handwriting_image']));
+        $hwHasPhoto = !empty($postImages);
+    ?>
+        <div class="entry-handwriting <?= $hwHasPhoto ? 'has-photo-above' : 'is-standalone' ?>">
+            <img
+                src="<?= htmlspecialchars($hwUrl) ?>"
+                alt="Håndskreven note: <?= htmlspecialchars($post['title']) ?>"
+                class="entry-handwriting-img"
+                loading="lazy"
+            >
+        </div>
+    <?php endif; ?>
+
     <footer class="entry-meta">
         <div class="meta-bottom">
             <div class="meta-tags">

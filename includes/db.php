@@ -109,6 +109,12 @@ function init_db_schema(PDO $db): void {
     if (!in_array('exif_lens', $existingCols)) {
         $db->exec("ALTER TABLE posts ADD COLUMN exif_lens TEXT");
     }
+    if (!in_array('handwriting_image', $existingCols)) {
+        $db->exec("ALTER TABLE posts ADD COLUMN handwriting_image TEXT");
+    }
+    if (!in_array('handwriting_data', $existingCols)) {
+        $db->exec("ALTER TABLE posts ADD COLUMN handwriting_data TEXT");
+    }
     $db->exec("CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status)");
 
     // Flere billeder pr. indlæg (diptykon / serie)

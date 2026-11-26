@@ -27,7 +27,12 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
             $u = rtrim(BASE_URL, '/') . '/uploads/' . rawurlencode(basename($pImg));
             $imgTags .= '<p><img src="' . htmlspecialchars($u) . '" alt="' . htmlspecialchars($post['title']) . '" /></p>';
         }
-        $desc = $imgTags . render_content($post['content']);
+        $hwTag = '';
+        if (!empty($post['handwriting_image'])) {
+            $hwU = rtrim(BASE_URL, '/') . '/uploads/' . rawurlencode(basename($post['handwriting_image']));
+            $hwTag = '<p><img src="' . htmlspecialchars($hwU) . '" alt="Håndskreven note: ' . htmlspecialchars($post['title']) . '" /></p>';
+        }
+        $desc = $imgTags . render_content($post['content']) . $hwTag;
         $exifStr = format_exif($post);
         if (!empty($exifStr)) {
             $desc .= '<p><small>⌀ ' . htmlspecialchars($exifStr) . '</small></p>';
@@ -36,8 +41,9 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
             $desc .= '<p><em>⌖ ' . htmlspecialchars($post['location']) . '</em></p>';
         }
         $postTags = get_post_tags((int)$post['id']);
-        $primaryFile = !empty($postImages[0]) ? UPLOADS_DIR . '/' . basename($postImages[0]) : '';
-        $primaryUrl = !empty($postImages[0]) ? rtrim(BASE_URL, '/') . '/uploads/' . rawurlencode(basename($postImages[0])) : '';
+        $primaryRel = !empty($postImages[0]) ? $postImages[0] : ($post['handwriting_image'] ?? '');
+        $primaryFile = !empty($primaryRel) ? UPLOADS_DIR . '/' . basename($primaryRel) : '';
+        $primaryUrl = !empty($primaryRel) ? rtrim(BASE_URL, '/') . '/uploads/' . rawurlencode(basename($primaryRel)) : '';
         $enclosureMime = 'image/jpeg';
         $enclosureLen = 0;
         if ($primaryFile && is_file($primaryFile)) {

@@ -28,7 +28,8 @@ if (!$param) {
 }
 
 $post = get_post_by_identifier((string)$param);
-if (!$post || empty($post['image_path'])) {
+$primarySourceName = !empty($post['image_path']) ? $post['image_path'] : ($post['handwriting_image'] ?? '');
+if (!$post || empty($primarySourceName)) {
     http_response_code(404);
     die('Indlæg eller billede ikke fundet');
 }
@@ -50,7 +51,7 @@ if (!in_array($style, $validStyles, true)) {
     $style = 'notebook';
 }
 
-$sourceFile = UPLOADS_DIR . '/' . basename($post['image_path']);
+$sourceFile = UPLOADS_DIR . '/' . basename($primarySourceName);
 if (!is_file($sourceFile)) {
     http_response_code(404);
     die('Billedfil ikke fundet');
@@ -90,6 +91,29 @@ $srcImg = load_image_with_orientation($sourceFile);
 if (!$srcImg) {
     send_image_file($sourceFile);
     exit;
+}
+
+// Hvis kildebilledet er en transparent håndskrifts-PNG, lægges det på varmt linjeret papir først
+if (empty($post['image_path']) && !empty($post['handwriting_image'])) {
+    $sw = imagesx($srcImg);
+    $sh = imagesy($srcImg);
+    $padX = (int)round($sw * 0.06);
+    $padY = (int)round($sw * 0.05);
+    $paperW = $sw + $padX * 2;
+    $paperH = max((int)round($paperW * 0.62), $sh + $padY * 2);
+    $paper = imagecreatetruecolor($paperW, $paperH);
+    imagealphablending($paper, true);
+    $cream = imagecolorallocate($paper, 249, 247, 241);
+    $ruleCol = imagecolorallocatealpha($paper, 110, 102, 92, 98);
+    imagefilledrectangle($paper, 0, 0, $paperW, $paperH, $cream);
+    $ruleStep = max(32, (int)round($sw / 20));
+    for ($ry = $ruleStep; $ry < $paperH; $ry += $ruleStep) {
+        imageline($paper, 0, $ry, $paperW, $ry, $ruleCol);
+    }
+    $destY = (int)round(($paperH - $sh) / 2);
+    imagecopy($paper, $srcImg, $padX, max($padY, $destY), 0, 0, $sw, $sh);
+    imagedestroy($srcImg);
+    $srcImg = $paper;
 }
 
 // -------------------------------------------------------------

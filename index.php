@@ -110,10 +110,18 @@ function render_contact_sheet_grid(array $sheet, array $monthNames, bool $linkTo
                     $href = $linkToAnchor 
                         ? ('#entry-' . htmlspecialchars($eUid))
                         : htmlspecialchars(get_post_url($entry));
-                    $thumbUrl = get_thumbnail_url($entry['image_path']);
+                    $isHwOnly = empty($entry['image_path']) && !empty($entry['handwriting_image']);
+                    $thumbUrl = $isHwOnly
+                        ? (UPLOADS_URL . '/' . rawurlencode(basename($entry['handwriting_image'])))
+                        : get_thumbnail_url($entry['image_path']);
                 ?>
-                    <a href="<?= $href ?>" class="contact-cell contact-cell-filled" title="<?= htmlspecialchars($dInfo['date_label'] . ' – ' . $entry['title']) ?>">
-                        <img src="<?= $thumbUrl ?>" alt="<?= htmlspecialchars($entry['title']) ?>" loading="lazy" class="contact-thumb">
+                    <a href="<?= $href ?>" class="contact-cell contact-cell-filled <?= $isHwOnly ? 'contact-cell-handwriting' : '' ?>" title="<?= htmlspecialchars($dInfo['date_label'] . ' – ' . $entry['title']) ?>">
+                        <?php if ($thumbUrl !== ''): ?>
+                            <img src="<?= htmlspecialchars($thumbUrl) ?>" alt="<?= htmlspecialchars($entry['title']) ?>" loading="lazy" class="contact-thumb <?= $isHwOnly ? 'contact-thumb-handwriting' : '' ?>">
+                        <?php endif; ?>
+                        <?php if ($isHwOnly): ?>
+                            <span class="contact-hw-badge" aria-hidden="true">✎</span>
+                        <?php endif; ?>
                         <span class="contact-day-num"><?= $dayStr ?></span>
                         <?php if ($dInfo['count'] > 1): ?>
                             <span class="contact-multi-badge">×<?= (int)$dInfo['count'] ?></span>
@@ -132,7 +140,9 @@ function render_contact_sheet_grid(array $sheet, array $monthNames, bool $linkTo
 }
 ?>
 <?php
-$socialImg = !empty($posts[0]['image_path']) ? (get_post_og_meta($posts[0]) ?? get_social_image_meta($posts[0]['image_path'])) : null;
+$socialImg = (!empty($posts[0]['image_path']) || !empty($posts[0]['handwriting_image']))
+    ? (get_post_og_meta($posts[0]) ?? get_social_image_meta($posts[0]['image_path'] ?: $posts[0]['handwriting_image']))
+    : null;
 $ogTitle = !empty($activeFilterTitle) ? ($activeFilterTitle . ' – ' . SITE_TITLE) : SITE_TITLE;
 ?>
 <!DOCTYPE html>
@@ -558,6 +568,49 @@ if (document.readyState === 'complete') {
             showSheet(currentIndex - 1); // Nyere
         }
     });
+})();
+
+// Lås håndskriftens grundlinjer til logbogens 32px-papirlinjer
+(function alignHandwritingToRules() {
+    function alignAll() {
+        document.querySelectorAll('.entry-handwriting').forEach(wrap => {
+            const img = wrap.querySelector('.entry-handwriting-img');
+            const entry = wrap.closest('.log-entry');
+            if (!img || !entry || !img.naturalWidth || !img.naturalHeight) return;
+
+            const renderedW = img.clientWidth;
+            const renderedH = img.clientHeight;
+            if (!renderedW || !renderedH) return;
+
+            const hwScale = Math.max(1, Math.round(img.naturalWidth / 644));
+            const expectedLogicalW = img.naturalWidth / hwScale;
+            const linePx = 32 * hwScale;
+            const isOneToOne = Math.abs(renderedW - expectedLogicalW) <= 6;
+
+            if (isOneToOne && img.naturalHeight % linePx === 0) {
+                wrap.classList.remove('is-scaled-ruled');
+                wrap.style.removeProperty('--hw-line-h');
+                wrap.style.marginTop = '32px';
+                const rem = wrap.offsetTop % 32;
+                if (rem !== 0) {
+                    wrap.style.marginTop = (32 + (32 - rem)) + 'px';
+                }
+            } else if (img.naturalHeight % linePx === 0) {
+                const lines = img.naturalHeight / linePx;
+                const scaledLineH = renderedH / lines;
+                wrap.style.marginTop = '24px';
+                wrap.style.setProperty('--hw-line-h', scaledLineH.toFixed(2) + 'px');
+                wrap.classList.add('is-scaled-ruled');
+            }
+        });
+    }
+
+    document.querySelectorAll('.entry-handwriting-img').forEach(img => {
+        if (!img.complete) img.addEventListener('load', alignAll);
+    });
+    window.addEventListener('load', alignAll);
+    window.addEventListener('resize', alignAll);
+    if (document.readyState !== 'loading') alignAll();
 })();
 </script>
 
